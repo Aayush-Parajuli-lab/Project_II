@@ -1,15 +1,15 @@
-# 📈 StockPredict AI - Full Stack Stock Prediction App
+# StockVision Pro - Professional Market Analytics Platform
 
-A comprehensive stock prediction application built with **React**, **Node.js**, **MySQL**, and **Machine Learning** algorithms. This application demonstrates advanced sorting algorithms and Random Forest-based stock price prediction.
+A modern, professional stock analysis application built with **React**, **Node.js**, **MySQL**, and **Google OAuth**. Features a clean black & white design, real-time data from Ninja API, and advanced machine learning algorithms for market predictions.
 
 ## 🚀 Features
 
-### 🌲 Machine Learning & Predictions
-- **Random Forest Algorithm** for stock price prediction
-- Technical indicators analysis (SMA, EMA, RSI, Volatility)
-- Confidence scoring for predictions
-- Real-time data integration with Yahoo Finance API
-- Historical data analysis and pattern recognition
+### 🔐 Authentication & Security
+- **Google OAuth 2.0** authentication
+- **JWT** token-based session management
+- Secure user profile management
+- Protected API endpoints
+- Session persistence and logout
 
 ### 🔀 Advanced Sorting Algorithms
 - **Quick Sort** - O(n log n) average case performance
@@ -21,13 +21,16 @@ A comprehensive stock prediction application built with **React**, **Node.js**, 
 
 ### 🎨 Modern Frontend
 - **React 18** with functional components and hooks
+- **Black & White Theme** - Professional monochrome design
+- **Custom CSS** - No Bootstrap/Tailwind dependencies
 - **Responsive design** with CSS Grid and Flexbox
-- **Dark theme** with professional color scheme
 - **Interactive UI** with smooth animations
 - **Real-time updates** and loading states
 
 ### 🔧 Robust Backend
 - **Node.js** with Express.js framework
+- **Ninja API** integration for real-time stock data
+- **Passport.js** for Google OAuth authentication
 - **MySQL** database with optimized schema
 - **RESTful API** design with proper error handling
 - **CORS** configuration for frontend integration
@@ -46,7 +49,9 @@ A comprehensive stock prediction application built with **React**, **Node.js**, 
 - **Node.js** - Runtime environment
 - **Express.js** 4.18.2 - Web framework
 - **MySQL2** 3.6.5 - Database driver
-- **Yahoo Finance API** 2.4.3 - Real-time stock data
+- **Ninja API** - Real-time stock data
+- **Passport.js** - Google OAuth authentication
+- **Google Auth Library** - OAuth client library
 - **Node-cron** 3.0.3 - Scheduled tasks
 
 ### Machine Learning

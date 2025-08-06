@@ -28,6 +28,7 @@ import StockDetail from './components/StockDetail';
 import PredictionDashboard from './components/PredictionDashboard';
 import AddStock from './components/AddStock';
 import SortingDemo from './components/SortingDemo';
+import GoogleAuth from './components/GoogleAuth';
 import AdminLogin from './components/admin/AdminLogin';
 import AdminDashboard from './components/admin/AdminDashboard';
 import AdminUsers from './components/admin/AdminUsers';
@@ -206,6 +207,16 @@ function App() {
                 element={<SortingDemo stocks={stocks} />} 
               />
               
+              {/* Google Auth Routes */}
+              <Route 
+                path="/auth" 
+                element={<GoogleAuth />} 
+              />
+              <Route 
+                path="/auth/success" 
+                element={<GoogleAuth />} 
+              />
+              
               {/* Admin Routes */}
               <Route 
                 path="/admin/login" 
@@ -264,8 +275,8 @@ function Header({ serverStatus, onRefreshHealth }) {
         {/* Logo/Title */}
         <div className="logo-section">
           <Link to="/" className="logo-link">
-            <h1 className="app-title">📈 StockPredict AI</h1>
-            <p className="app-subtitle">Random Forest Prediction Engine</p>
+            <h1 className="app-title">StockVision Pro</h1>
+            <p className="app-subtitle">Advanced Market Analytics Platform</p>
           </Link>
         </div>
 
@@ -275,31 +286,31 @@ function Header({ serverStatus, onRefreshHealth }) {
             to="/" 
             className={`nav-link ${location.pathname === '/' ? 'active' : ''}`}
           >
-            🏠 Dashboard
+            Dashboard
           </Link>
           <Link 
             to="/predictions" 
             className={`nav-link ${location.pathname === '/predictions' ? 'active' : ''}`}
           >
-            🔮 Predictions
+            Predictions
           </Link>
           <Link 
             to="/add-stock" 
             className={`nav-link ${location.pathname === '/add-stock' ? 'active' : ''}`}
           >
-            ➕ Add Stock
+            Add Stock
           </Link>
           <Link 
             to="/sorting-demo" 
             className={`nav-link ${location.pathname === '/sorting-demo' ? 'active' : ''}`}
           >
-            🔀 Sorting Demo
+            Algorithms
           </Link>
           <Link 
-            to="/admin/login" 
-            className={`nav-link ${location.pathname.startsWith('/admin') ? 'active' : ''}`}
+            to="/auth" 
+            className={`nav-link ${location.pathname.startsWith('/auth') ? 'active' : ''}`}
           >
-            🛠️ Admin
+            Login
           </Link>
         </nav>
 
@@ -327,32 +338,32 @@ function Footer() {
     <footer className="app-footer">
       <div className="footer-content">
         <div className="footer-section">
-          <h4>🌲 Algorithms</h4>
+          <h4>Algorithms</h4>
           <p>Random Forest Regression</p>
           <p>Quick Sort • Merge Sort • Heap Sort</p>
         </div>
         
         <div className="footer-section">
-          <h4>📊 Data Sources</h4>
-          <p>Yahoo Finance API</p>
+          <h4>Data Sources</h4>
+          <p>Ninja API</p>
           <p>Real-time Market Data</p>
         </div>
         
         <div className="footer-section">
-          <h4>🛠️ Tech Stack</h4>
+          <h4>Tech Stack</h4>
           <p>React • Node.js • MySQL</p>
-          <p>Machine Learning • REST API</p>
+          <p>Google OAuth • Machine Learning</p>
         </div>
         
         <div className="footer-section">
-          <h4>ℹ️ About</h4>
-          <p>Stock Prediction App v1.0</p>
-          <p>Built with ❤️ for learning</p>
+          <h4>About</h4>
+          <p>StockVision Pro v2.0</p>
+          <p>Professional Market Analysis</p>
         </div>
       </div>
       
       <div className="footer-bottom">
-        <p>© 2024 StockPredict AI • Educational Project • Not Financial Advice</p>
+        <p>© 2024 StockVision Pro • Professional Market Analytics • Not Financial Advice</p>
       </div>
     </footer>
   );

@@ -18,11 +18,12 @@ import cors from 'cors';
 import mysql from 'mysql2/promise';
 import dotenv from 'dotenv';
 import cron from 'node-cron';
-import yahooFinance from 'yahoo-finance2';
 import bcrypt from 'bcrypt';
 import jwt from 'jsonwebtoken';
 import session from 'express-session';
 import cookieParser from 'cookie-parser';
+import passport from './config/googleAuth.js';
+import NinjaStockAPI from './services/ninjaStockAPI.js';
 import { StockRandomForest } from './algorithms/randomForest.js';
 import { StockSorter } from './utils/sortingAlgorithms.js';
 
@@ -49,6 +50,10 @@ app.use(session({
     }
 }));
 
+// Initialize Passport middleware
+app.use(passport.initialize());
+app.use(passport.session());
+
 // CORS configuration for frontend integration
 app.use(cors({
     origin: ['http://localhost:3000', 'http://127.0.0.1:3000'],
@@ -57,7 +62,7 @@ app.use(cors({
     allowedHeaders: ['Content-Type', 'Authorization']
 }));
 
-// Initialize algorithm instances
+// Initialize algorithm instances and services
 const randomForest = new StockRandomForest({
     nEstimators: 100,
     maxDepth: 10,
@@ -65,6 +70,7 @@ const randomForest = new StockRandomForest({
 });
 
 const stockSorter = new StockSorter();
+const ninjaAPI = new NinjaStockAPI();
 
 // JWT Secret
 const JWT_SECRET = process.env.JWT_SECRET || 'stock-predict-jwt-secret';
@@ -623,6 +629,71 @@ app.put('/api/admin/settings/:key', authenticateToken, requireAdmin, async (req,
 
 /**
  * ===========================================
+ * GOOGLE OAUTH ENDPOINTS
+ * ===========================================
+ */
+
+// Google OAuth login route
+app.get('/api/auth/google',
+    passport.authenticate('google', { scope: ['profile', 'email'] })
+);
+
+// Google OAuth callback route
+app.get('/api/auth/google/callback',
+    passport.authenticate('google', { failureRedirect: '/login' }),
+    (req, res) => {
+        // Successful authentication, redirect or send token
+        const token = jwt.sign(
+            { 
+                id: req.user.googleId, 
+                email: req.user.email,
+                name: req.user.name 
+            },
+            JWT_SECRET,
+            { expiresIn: '24h' }
+        );
+        
+        // Redirect to frontend with token
+        res.redirect(`http://localhost:3000/auth/success?token=${token}`);
+    }
+);
+
+// Get current user info
+app.get('/api/auth/user', authenticateToken, (req, res) => {
+    res.json({
+        success: true,
+        data: {
+            user: req.user
+        }
+    });
+});
+
+// Logout route
+app.post('/api/auth/logout', (req, res) => {
+    req.logout((err) => {
+        if (err) {
+            return res.status(500).json({
+                success: false,
+                error: 'Error logging out'
+            });
+        }
+        req.session.destroy((err) => {
+            if (err) {
+                return res.status(500).json({
+                    success: false,
+                    error: 'Error destroying session'
+                });
+            }
+            res.json({
+                success: true,
+                message: 'Logged out successfully'
+            });
+        });
+    });
+});
+
+/**
+ * ===========================================
  * STOCK DATA ENDPOINTS
  * ===========================================
  */
@@ -1082,16 +1153,16 @@ app.get('/api/sort/criteria', (req, res) => {
 
 /**
  * POST /api/fetch-realtime/:symbol
- * Fetch real-time data from Yahoo Finance
+ * Fetch real-time data from Ninja API
  */
 app.post('/api/fetch-realtime/:symbol', async (req, res) => {
     try {
         const { symbol } = req.params;
         
-        console.log(`🌐 Fetching real-time data for ${symbol}...`);
+        console.log(`🌐 Fetching real-time data for ${symbol} from Ninja API...`);
         
-        // Fetch from Yahoo Finance
-        const quote = await yahooFinance.quote(symbol);
+        // Fetch from Ninja API
+        const quote = await ninjaAPI.getStockQuote(symbol);
         
         if (!quote) {
             return res.status(404).json({
@@ -1117,14 +1188,14 @@ app.post('/api/fetch-realtime/:symbol', async (req, res) => {
             success: true,
             data: {
                 symbol: quote.symbol,
-                price: quote.regularMarketPrice,
-                change: quote.regularMarketChange,
-                changePercent: quote.regularMarketChangePercent,
-                volume: quote.regularMarketVolume,
+                price: quote.price,
+                change: quote.change,
+                changePercent: quote.changePercent,
+                volume: quote.volume,
                 marketCap: quote.marketCap,
-                dayHigh: quote.regularMarketDayHigh,
-                dayLow: quote.regularMarketDayLow,
-                timestamp: new Date().toISOString()
+                dayHigh: quote.high,
+                dayLow: quote.low,
+                timestamp: quote.timestamp
             }
         });
         
@@ -1214,10 +1285,10 @@ cron.schedule('0 18 * * 1-5', async () => {
         
         for (const stock of stocks) {
             try {
-                // Fetch latest data
-                const quote = await yahooFinance.quote(stock.symbol);
+                // Fetch latest data from Ninja API
+                const quote = await ninjaAPI.getStockQuote(stock.symbol);
                 
-                if (quote && quote.regularMarketPrice) {
+                if (quote && quote.price) {
                     // Add to historical data
                     await db.execute(
                         `INSERT IGNORE INTO historical_data 
@@ -1225,12 +1296,12 @@ cron.schedule('0 18 * * 1-5', async () => {
                          SELECT id, CURDATE(), ?, ?, ?, ?, ?, ?
                          FROM stocks WHERE symbol = ?`,
                         [
-                            quote.regularMarketPreviousClose || quote.regularMarketPrice,
-                            quote.regularMarketDayHigh || quote.regularMarketPrice,
-                            quote.regularMarketDayLow || quote.regularMarketPrice,
-                            quote.regularMarketPrice,
-                            quote.regularMarketVolume || 0,
-                            quote.regularMarketPrice,
+                            quote.open || quote.price,
+                            quote.high || quote.price,
+                            quote.low || quote.price,
+                            quote.price,
+                            quote.volume || 0,
+                            quote.price,
                             stock.symbol
                         ]
                     );
