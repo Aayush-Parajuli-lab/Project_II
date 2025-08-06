@@ -1,7 +1,7 @@
 {
   "name": "stock-prediction-backend",
   "version": "1.0.0",
-  "description": "Backend for Stock Prediction App",
+  "description": "Backend for Stock Prediction App with Random Forest Algorithm",
   "main": "server.js",
   "type": "module",
   "scripts": {
@@ -9,7 +9,7 @@
     "start": "node server.js",
     "dev": "nodemon server.js"
   },
-  "keywords": ["stock", "prediction", "api"],
+  "keywords": ["stock", "prediction", "api", "random-forest", "machine-learning"],
   "author": "",
   "license": "ISC",
   "dependencies": {
@@ -20,6 +20,9 @@
     "mysql2": "^3.6.5",
     "nodemon": "^3.0.2",
     "node-cron": "^3.0.3",
-    "yahoofinance2": "^2.4.3"
+    "yahoo-finance2": "^2.4.3",
+    "ml-random-forest": "^2.1.0",
+    "ml-matrix": "^6.10.9",
+    "mathjs": "^12.2.1"
   }
 }
