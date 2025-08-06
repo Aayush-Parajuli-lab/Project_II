@@ -18,11 +18,12 @@
  */
 
 import React, { useState, useEffect } from 'react';
-import { BrowserRouter as Router, Routes, Route, Link, useLocation } from 'react-router-dom';
+import { Routes, Route, Link, useLocation } from 'react-router-dom';
 import axios from 'axios';
 import './App.css';
 
 // Import components
+import Welcome from './components/Welcome';
 import StockList from './components/StockList';
 import StockDetail from './components/StockDetail';
 import PredictionDashboard from './components/PredictionDashboard';
@@ -161,17 +162,22 @@ function App() {
 
   return (
     <div className="App">
-      <Router>
-        <div className="app-container">
-          {/* Header/Navigation */}
-          <Header serverStatus={serverStatus} onRefreshHealth={checkServerHealth} />
-          
-          {/* Main Content */}
-          <main className="main-content">
-            <Routes>
-              {/* Home/Stock List Route */}
+      <div className="app-container">
+        {/* Header/Navigation */}
+        <Header serverStatus={serverStatus} onRefreshHealth={checkServerHealth} />
+        
+        {/* Main Content */}
+        <main className="main-content">
+                      <Routes>
+              {/* Home/Welcome Route */}
               <Route 
                 path="/" 
+                element={<Welcome />} 
+              />
+              
+              {/* Stock List Route */}
+              <Route 
+                path="/stocks" 
                 element={
                   <StockList 
                     stocks={stocks}
@@ -234,13 +240,12 @@ function App() {
                 path="/admin/settings" 
                 element={<AdminSettings adminAuth={adminAuth} />} 
               />
-            </Routes>
-          </main>
-          
-          {/* Footer */}
-          <Footer />
-        </div>
-      </Router>
+          </Routes>
+        </main>
+        
+        {/* Footer */}
+        <Footer />
+      </div>
     </div>
   );
 }
@@ -286,7 +291,13 @@ function Header({ serverStatus, onRefreshHealth }) {
             to="/" 
             className={`nav-link ${location.pathname === '/' ? 'active' : ''}`}
           >
-            Dashboard
+            Home
+          </Link>
+          <Link 
+            to="/stocks" 
+            className={`nav-link ${location.pathname === '/stocks' ? 'active' : ''}`}
+          >
+            Stocks
           </Link>
           <Link 
             to="/predictions" 
