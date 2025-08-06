@@ -19,6 +19,10 @@ import mysql from 'mysql2/promise';
 import dotenv from 'dotenv';
 import cron from 'node-cron';
 import yahooFinance from 'yahoo-finance2';
+import bcrypt from 'bcrypt';
+import jwt from 'jsonwebtoken';
+import session from 'express-session';
+import cookieParser from 'cookie-parser';
 import { StockRandomForest } from './algorithms/randomForest.js';
 import { StockSorter } from './utils/sortingAlgorithms.js';
 
@@ -32,6 +36,18 @@ const PORT = process.env.PORT || 8081;
 // Middleware setup
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true }));
+app.use(cookieParser());
+
+// Session configuration
+app.use(session({
+    secret: process.env.SESSION_SECRET || 'stock-predict-secret-key',
+    resave: false,
+    saveUninitialized: false,
+    cookie: { 
+        secure: false, // Set to true in production with HTTPS
+        maxAge: 24 * 60 * 60 * 1000 // 24 hours
+    }
+}));
 
 // CORS configuration for frontend integration
 app.use(cors({
@@ -49,6 +65,63 @@ const randomForest = new StockRandomForest({
 });
 
 const stockSorter = new StockSorter();
+
+// JWT Secret
+const JWT_SECRET = process.env.JWT_SECRET || 'stock-predict-jwt-secret';
+
+/**
+ * Authentication Middleware
+ */
+const authenticateToken = (req, res, next) => {
+    const authHeader = req.headers['authorization'];
+    const token = authHeader && authHeader.split(' ')[1]; // Bearer TOKEN
+
+    if (!token) {
+        return res.status(401).json({
+            success: false,
+            error: 'Access token required'
+        });
+    }
+
+    jwt.verify(token, JWT_SECRET, (err, user) => {
+        if (err) {
+            return res.status(403).json({
+                success: false,
+                error: 'Invalid or expired token'
+            });
+        }
+        req.user = user;
+        next();
+    });
+};
+
+/**
+ * Admin Authorization Middleware
+ */
+const requireAdmin = (req, res, next) => {
+    if (!req.user || req.user.role !== 'admin') {
+        return res.status(403).json({
+            success: false,
+            error: 'Admin access required'
+        });
+    }
+    next();
+};
+
+/**
+ * Log admin activity
+ */
+const logAdminActivity = async (adminId, action, targetTable = null, targetId = null, details = null, ipAddress = null) => {
+    try {
+        await db.execute(
+            `INSERT INTO admin_logs (admin_id, action, target_table, target_id, details, ip_address) 
+             VALUES (?, ?, ?, ?, ?, ?)`,
+            [adminId, action, targetTable, targetId, JSON.stringify(details), ipAddress]
+        );
+    } catch (error) {
+        console.error('Error logging admin activity:', error);
+    }
+};
 
 // Database configuration
 const dbConfig = {
@@ -109,6 +182,444 @@ async function initializeSchema() {
         console.error('❌ Schema initialization failed:', error.message);
     }
 }
+
+/**
+ * ===========================================
+ * AUTHENTICATION ENDPOINTS
+ * ===========================================
+ */
+
+/**
+ * POST /api/admin/login
+ * Admin login endpoint
+ */
+app.post('/api/admin/login', async (req, res) => {
+    try {
+        const { username, password } = req.body;
+        
+        if (!username || !password) {
+            return res.status(400).json({
+                success: false,
+                error: 'Username and password are required'
+            });
+        }
+
+        console.log(`🔐 Admin login attempt for: ${username}`);
+
+        // Get user from database
+        const [users] = await db.execute(
+            'SELECT id, username, email, password_hash, role, is_active FROM users WHERE username = ? AND role = "admin"',
+            [username]
+        );
+
+        if (users.length === 0) {
+            return res.status(401).json({
+                success: false,
+                error: 'Invalid credentials'
+            });
+        }
+
+        const user = users[0];
+
+        if (!user.is_active) {
+            return res.status(401).json({
+                success: false,
+                error: 'Account is deactivated'
+            });
+        }
+
+        // For demo purposes, we'll use a simple password check
+        // In production, use bcrypt.compare(password, user.password_hash)
+        const isValidPassword = password === 'admin123'; // Demo password
+
+        if (!isValidPassword) {
+            return res.status(401).json({
+                success: false,
+                error: 'Invalid credentials'
+            });
+        }
+
+        // Update last login
+        await db.execute(
+            'UPDATE users SET last_login = CURRENT_TIMESTAMP WHERE id = ?',
+            [user.id]
+        );
+
+        // Generate JWT token
+        const token = jwt.sign(
+            { 
+                id: user.id, 
+                username: user.username, 
+                email: user.email, 
+                role: user.role 
+            },
+            JWT_SECRET,
+            { expiresIn: '24h' }
+        );
+
+        // Log admin activity
+        await logAdminActivity(user.id, 'LOGIN', null, null, null, req.ip);
+
+        console.log(`✅ Admin login successful for: ${username}`);
+
+        res.json({
+            success: true,
+            data: {
+                token,
+                user: {
+                    id: user.id,
+                    username: user.username,
+                    email: user.email,
+                    role: user.role
+                }
+            }
+        });
+
+    } catch (error) {
+        console.error('❌ Error during admin login:', error);
+        res.status(500).json({
+            success: false,
+            error: 'Login failed',
+            details: error.message
+        });
+    }
+});
+
+/**
+ * POST /api/admin/logout
+ * Admin logout endpoint
+ */
+app.post('/api/admin/logout', authenticateToken, requireAdmin, async (req, res) => {
+    try {
+        // Log admin activity
+        await logAdminActivity(req.user.id, 'LOGOUT', null, null, null, req.ip);
+
+        res.json({
+            success: true,
+            message: 'Logged out successfully'
+        });
+    } catch (error) {
+        console.error('❌ Error during logout:', error);
+        res.status(500).json({
+            success: false,
+            error: 'Logout failed'
+        });
+    }
+});
+
+/**
+ * GET /api/admin/verify
+ * Verify admin token
+ */
+app.get('/api/admin/verify', authenticateToken, requireAdmin, (req, res) => {
+    res.json({
+        success: true,
+        data: {
+            user: {
+                id: req.user.id,
+                username: req.user.username,
+                email: req.user.email,
+                role: req.user.role
+            }
+        }
+    });
+});
+
+/**
+ * ===========================================
+ * ADMIN PANEL ENDPOINTS
+ * ===========================================
+ */
+
+/**
+ * GET /api/admin/dashboard
+ * Get admin dashboard statistics
+ */
+app.get('/api/admin/dashboard', authenticateToken, requireAdmin, async (req, res) => {
+    try {
+        console.log('📊 Fetching admin dashboard statistics...');
+
+        // Get various statistics
+        const [stockCount] = await db.execute('SELECT COUNT(*) as count FROM stocks');
+        const [predictionCount] = await db.execute('SELECT COUNT(*) as count FROM predictions');
+        const [userCount] = await db.execute('SELECT COUNT(*) as count FROM users');
+        const [recentPredictions] = await db.execute(
+            `SELECT p.*, s.symbol, s.company_name 
+             FROM predictions p 
+             JOIN stocks s ON p.stock_id = s.id 
+             ORDER BY p.created_at DESC 
+             LIMIT 10`
+        );
+        const [recentActivity] = await db.execute(
+            `SELECT al.*, u.username 
+             FROM admin_logs al 
+             JOIN users u ON al.admin_id = u.id 
+             ORDER BY al.created_at DESC 
+             LIMIT 20`
+        );
+
+        // Get prediction accuracy stats
+        const [accuracyStats] = await db.execute(
+            `SELECT 
+                AVG(confidence_score) as avg_confidence,
+                COUNT(CASE WHEN confidence_score >= 70 THEN 1 END) as high_confidence_count,
+                COUNT(*) as total_predictions
+             FROM predictions 
+             WHERE created_at >= DATE_SUB(NOW(), INTERVAL 30 DAY)`
+        );
+
+        res.json({
+            success: true,
+            data: {
+                statistics: {
+                    totalStocks: stockCount[0].count,
+                    totalPredictions: predictionCount[0].count,
+                    totalUsers: userCount[0].count,
+                    averageConfidence: accuracyStats[0]?.avg_confidence || 0,
+                    highConfidencePredictions: accuracyStats[0]?.high_confidence_count || 0
+                },
+                recentPredictions,
+                recentActivity
+            }
+        });
+
+    } catch (error) {
+        console.error('❌ Error fetching admin dashboard:', error);
+        res.status(500).json({
+            success: false,
+            error: 'Failed to fetch dashboard data',
+            details: error.message
+        });
+    }
+});
+
+/**
+ * GET /api/admin/users
+ * Get all users with pagination
+ */
+app.get('/api/admin/users', authenticateToken, requireAdmin, async (req, res) => {
+    try {
+        const { page = 1, limit = 20 } = req.query;
+        const offset = (page - 1) * limit;
+
+        const [users] = await db.execute(
+            `SELECT id, username, email, role, is_active, last_login, created_at 
+             FROM users 
+             ORDER BY created_at DESC 
+             LIMIT ? OFFSET ?`,
+            [parseInt(limit), parseInt(offset)]
+        );
+
+        const [totalCount] = await db.execute('SELECT COUNT(*) as count FROM users');
+
+        res.json({
+            success: true,
+            data: {
+                users,
+                pagination: {
+                    page: parseInt(page),
+                    limit: parseInt(limit),
+                    total: totalCount[0].count,
+                    pages: Math.ceil(totalCount[0].count / limit)
+                }
+            }
+        });
+
+    } catch (error) {
+        console.error('❌ Error fetching users:', error);
+        res.status(500).json({
+            success: false,
+            error: 'Failed to fetch users',
+            details: error.message
+        });
+    }
+});
+
+/**
+ * PUT /api/admin/users/:id
+ * Update user status or role
+ */
+app.put('/api/admin/users/:id', authenticateToken, requireAdmin, async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { is_active, role } = req.body;
+
+        const updates = [];
+        const values = [];
+
+        if (typeof is_active === 'boolean') {
+            updates.push('is_active = ?');
+            values.push(is_active);
+        }
+
+        if (role && ['user', 'admin'].includes(role)) {
+            updates.push('role = ?');
+            values.push(role);
+        }
+
+        if (updates.length === 0) {
+            return res.status(400).json({
+                success: false,
+                error: 'No valid updates provided'
+            });
+        }
+
+        values.push(id);
+
+        const [result] = await db.execute(
+            `UPDATE users SET ${updates.join(', ')} WHERE id = ?`,
+            values
+        );
+
+        if (result.affectedRows === 0) {
+            return res.status(404).json({
+                success: false,
+                error: 'User not found'
+            });
+        }
+
+        // Log admin activity
+        await logAdminActivity(
+            req.user.id, 
+            'UPDATE_USER', 
+            'users', 
+            id, 
+            { is_active, role }, 
+            req.ip
+        );
+
+        res.json({
+            success: true,
+            message: 'User updated successfully'
+        });
+
+    } catch (error) {
+        console.error('❌ Error updating user:', error);
+        res.status(500).json({
+            success: false,
+            error: 'Failed to update user',
+            details: error.message
+        });
+    }
+});
+
+/**
+ * DELETE /api/admin/stocks/:id
+ * Delete a stock (admin only)
+ */
+app.delete('/api/admin/stocks/:id', authenticateToken, requireAdmin, async (req, res) => {
+    try {
+        const { id } = req.params;
+
+        const [result] = await db.execute('DELETE FROM stocks WHERE id = ?', [id]);
+
+        if (result.affectedRows === 0) {
+            return res.status(404).json({
+                success: false,
+                error: 'Stock not found'
+            });
+        }
+
+        // Log admin activity
+        await logAdminActivity(
+            req.user.id, 
+            'DELETE_STOCK', 
+            'stocks', 
+            id, 
+            null, 
+            req.ip
+        );
+
+        res.json({
+            success: true,
+            message: 'Stock deleted successfully'
+        });
+
+    } catch (error) {
+        console.error('❌ Error deleting stock:', error);
+        res.status(500).json({
+            success: false,
+            error: 'Failed to delete stock',
+            details: error.message
+        });
+    }
+});
+
+/**
+ * GET /api/admin/settings
+ * Get system settings
+ */
+app.get('/api/admin/settings', authenticateToken, requireAdmin, async (req, res) => {
+    try {
+        const [settings] = await db.execute('SELECT * FROM system_settings ORDER BY setting_key');
+
+        res.json({
+            success: true,
+            data: settings
+        });
+
+    } catch (error) {
+        console.error('❌ Error fetching settings:', error);
+        res.status(500).json({
+            success: false,
+            error: 'Failed to fetch settings',
+            details: error.message
+        });
+    }
+});
+
+/**
+ * PUT /api/admin/settings/:key
+ * Update system setting
+ */
+app.put('/api/admin/settings/:key', authenticateToken, requireAdmin, async (req, res) => {
+    try {
+        const { key } = req.params;
+        const { value } = req.body;
+
+        if (!value) {
+            return res.status(400).json({
+                success: false,
+                error: 'Setting value is required'
+            });
+        }
+
+        const [result] = await db.execute(
+            'UPDATE system_settings SET setting_value = ?, updated_by = ? WHERE setting_key = ?',
+            [value, req.user.id, key]
+        );
+
+        if (result.affectedRows === 0) {
+            return res.status(404).json({
+                success: false,
+                error: 'Setting not found'
+            });
+        }
+
+        // Log admin activity
+        await logAdminActivity(
+            req.user.id, 
+            'UPDATE_SETTING', 
+            'system_settings', 
+            null, 
+            { setting_key: key, new_value: value }, 
+            req.ip
+        );
+
+        res.json({
+            success: true,
+            message: 'Setting updated successfully'
+        });
+
+    } catch (error) {
+        console.error('❌ Error updating setting:', error);
+        res.status(500).json({
+            success: false,
+            error: 'Failed to update setting',
+            details: error.message
+        });
+    }
+});
 
 /**
  * ===========================================

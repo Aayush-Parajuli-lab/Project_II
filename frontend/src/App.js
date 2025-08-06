@@ -28,6 +28,10 @@ import StockDetail from './components/StockDetail';
 import PredictionDashboard from './components/PredictionDashboard';
 import AddStock from './components/AddStock';
 import SortingDemo from './components/SortingDemo';
+import AdminLogin from './components/admin/AdminLogin';
+import AdminDashboard from './components/admin/AdminDashboard';
+import AdminUsers from './components/admin/AdminUsers';
+import AdminSettings from './components/admin/AdminSettings';
 
 // Configure axios defaults
 axios.defaults.baseURL = 'http://localhost:8081';
@@ -39,11 +43,46 @@ function App() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [serverStatus, setServerStatus] = useState('checking');
+  const [adminAuth, setAdminAuth] = useState({
+    isAuthenticated: false,
+    token: localStorage.getItem('adminToken'),
+    user: null
+  });
 
   // Check server health on component mount
   useEffect(() => {
     checkServerHealth();
+    checkAdminAuth();
   }, []);
+
+  /**
+   * Check admin authentication status
+   */
+  const checkAdminAuth = async () => {
+    const token = localStorage.getItem('adminToken');
+    if (!token) return;
+
+    try {
+      const response = await axios.get('/api/admin/verify', {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+
+      if (response.data.success) {
+        setAdminAuth({
+          isAuthenticated: true,
+          token,
+          user: response.data.data.user
+        });
+      }
+    } catch (error) {
+      localStorage.removeItem('adminToken');
+      setAdminAuth({
+        isAuthenticated: false,
+        token: null,
+        user: null
+      });
+    }
+  };
 
   /**
    * Check if backend server is running and healthy
@@ -166,6 +205,24 @@ function App() {
                 path="/sorting-demo" 
                 element={<SortingDemo stocks={stocks} />} 
               />
+              
+              {/* Admin Routes */}
+              <Route 
+                path="/admin/login" 
+                element={<AdminLogin onLogin={setAdminAuth} />} 
+              />
+              <Route 
+                path="/admin/dashboard" 
+                element={<AdminDashboard adminAuth={adminAuth} />} 
+              />
+              <Route 
+                path="/admin/users" 
+                element={<AdminUsers adminAuth={adminAuth} />} 
+              />
+              <Route 
+                path="/admin/settings" 
+                element={<AdminSettings adminAuth={adminAuth} />} 
+              />
             </Routes>
           </main>
           
@@ -237,6 +294,12 @@ function Header({ serverStatus, onRefreshHealth }) {
             className={`nav-link ${location.pathname === '/sorting-demo' ? 'active' : ''}`}
           >
             🔀 Sorting Demo
+          </Link>
+          <Link 
+            to="/admin/login" 
+            className={`nav-link ${location.pathname.startsWith('/admin') ? 'active' : ''}`}
+          >
+            🛠️ Admin
           </Link>
         </nav>
 

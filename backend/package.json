@@ -23,6 +23,10 @@
     "yahoo-finance2": "^2.4.3",
     "ml-random-forest": "^2.1.0",
     "ml-matrix": "^6.10.9",
-    "mathjs": "^12.2.1"
+    "mathjs": "^12.2.1",
+    "bcrypt": "^5.1.1",
+    "jsonwebtoken": "^9.0.2",
+    "express-session": "^1.18.0",
+    "cookie-parser": "^1.4.6"
   }
 }

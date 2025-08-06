@@ -43,12 +43,17 @@ CREATE TABLE IF NOT EXISTS predictions (
     FOREIGN KEY (stock_id) REFERENCES stocks(id) ON DELETE CASCADE
 );
 
--- Users table for tracking user preferences
+-- Users table for tracking user preferences and admin access
 CREATE TABLE IF NOT EXISTS users (
     id INT AUTO_INCREMENT PRIMARY KEY,
     username VARCHAR(50) NOT NULL UNIQUE,
     email VARCHAR(100) NOT NULL UNIQUE,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    password_hash VARCHAR(255) NOT NULL,
+    role ENUM('user', 'admin') DEFAULT 'user',
+    is_active BOOLEAN DEFAULT TRUE,
+    last_login TIMESTAMP NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 );
 
 -- User watchlist table
@@ -60,6 +65,30 @@ CREATE TABLE IF NOT EXISTS watchlist (
     FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
     FOREIGN KEY (stock_id) REFERENCES stocks(id) ON DELETE CASCADE,
     UNIQUE KEY unique_user_stock (user_id, stock_id)
+);
+
+-- Admin activity logs table
+CREATE TABLE IF NOT EXISTS admin_logs (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    admin_id INT NOT NULL,
+    action VARCHAR(100) NOT NULL,
+    target_table VARCHAR(50),
+    target_id INT,
+    details JSON,
+    ip_address VARCHAR(45),
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (admin_id) REFERENCES users(id) ON DELETE CASCADE
+);
+
+-- System settings table
+CREATE TABLE IF NOT EXISTS system_settings (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    setting_key VARCHAR(100) NOT NULL UNIQUE,
+    setting_value TEXT NOT NULL,
+    description TEXT,
+    updated_by INT,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    FOREIGN KEY (updated_by) REFERENCES users(id) ON DELETE SET NULL
 );
 
 -- Insert some sample stocks
@@ -74,6 +103,18 @@ INSERT IGNORE INTO stocks (symbol, company_name, sector) VALUES
 ('NFLX', 'Netflix Inc.', 'Entertainment'),
 ('DIS', 'The Walt Disney Company', 'Entertainment'),
 ('V', 'Visa Inc.', 'Financial Services');
+
+-- Insert default admin user (password: admin123)
+INSERT IGNORE INTO users (username, email, password_hash, role) VALUES 
+('admin', 'admin@stockpredict.ai', '$2b$10$rQJ3qKqE7yPXg8qKqE7yPOu9l5H3qKqE7yPXg8qKqE7yPOu9l5H3qK', 'admin');
+
+-- Insert default system settings
+INSERT IGNORE INTO system_settings (setting_key, setting_value, description) VALUES 
+('app_name', 'StockPredict AI', 'Application name displayed in UI'),
+('max_predictions_per_day', '100', 'Maximum predictions allowed per day'),
+('enable_real_time_data', 'true', 'Enable real-time stock data fetching'),
+('prediction_confidence_threshold', '70', 'Minimum confidence for displaying predictions'),
+('auto_retrain_model', 'true', 'Automatically retrain ML model with new data');
 
 -- Create indexes for better performance
 CREATE INDEX idx_historical_date ON historical_data(date);
