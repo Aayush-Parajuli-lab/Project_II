@@ -11,6 +11,11 @@
  * - Heap Sort (guaranteed O(n log n))
  */
 
+import { performance as nodePerformance } from 'node:perf_hooks';
+const perf = (typeof performance !== 'undefined' && performance && typeof performance.now === 'function')
+  ? performance
+  : nodePerformance;
+
 export class StockSorter {
     constructor() {
         this.compareFunctions = {
@@ -242,7 +247,7 @@ export class StockSorter {
      * @returns {Object} Results with sorted array and performance metrics
      */
     smartSort(arr, sortBy = 'symbol_asc', preferredAlgorithm = null) {
-        const startTime = performance.now();
+        const startTime = perf.now();
         
         let algorithm;
         let sortedArray;
@@ -280,7 +285,7 @@ export class StockSorter {
                 algorithm = 'quick';
         }
         
-        const endTime = performance.now();
+        const endTime = perf.now();
         const executionTime = endTime - startTime;
         
         console.log(`✅ Sorting completed in ${executionTime.toFixed(2)}ms using ${algorithm} sort`);
@@ -344,7 +349,7 @@ export class StockSorter {
         const results = {};
         
         for (const algorithm of algorithms) {
-            const startTime = performance.now();
+            const startTime = perf.now();
             
             switch (algorithm) {
                 case 'quick':
@@ -361,7 +366,7 @@ export class StockSorter {
                     break;
             }
             
-            const endTime = performance.now();
+            const endTime = perf.now();
             results[algorithm] = Math.round((endTime - startTime) * 100) / 100;
         }
         

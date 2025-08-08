@@ -22,13 +22,17 @@ import bcrypt from 'bcrypt';
 import jwt from 'jsonwebtoken';
 import session from 'express-session';
 import cookieParser from 'cookie-parser';
-import passport from './config/googleAuth.js';
+import passport, { isGoogleAuthConfigured } from './config/googleAuth.js';
 import NinjaStockAPI from './services/ninjaStockAPI.js';
 import { StockRandomForest } from './algorithms/randomForest.js';
 import { StockSorter } from './utils/sortingAlgorithms.js';
 
 // Load environment variables
 dotenv.config();
+
+// Demo mode flags
+const DEMO_MODE_REQUESTED = (process.env.DEMO_MODE || '').toString().toLowerCase() === 'true' || process.env.DEMO_MODE === '1';
+let DEMO_MODE_ACTIVE = false;
 
 // Initialize Express app
 const app = express();
@@ -144,23 +148,231 @@ const dbConfig = {
 // Create database connection pool
 let db;
 
+// Demo DB implementation
+function createDemoDb() {
+    console.log('🧪 Starting in DEMO MODE with in-memory data. No MySQL required.');
+    DEMO_MODE_ACTIVE = true;
+    const now = new Date();
+    let autoId = 1000;
+    const nextId = () => ++autoId;
+    const stocks = [
+        { id: 1, symbol: 'AAPL', company_name: 'Apple Inc.', sector: 'Technology', market_cap: 2500000000000, created_at: now, updated_at: now },
+        { id: 2, symbol: 'GOOGL', company_name: 'Alphabet Inc.', sector: 'Technology', market_cap: 1800000000000, created_at: now, updated_at: now },
+        { id: 3, symbol: 'MSFT', company_name: 'Microsoft Corporation', sector: 'Technology', market_cap: 2900000000000, created_at: now, updated_at: now },
+        { id: 4, symbol: 'AMZN', company_name: 'Amazon.com Inc.', sector: 'E-commerce', market_cap: 1600000000000, created_at: now, updated_at: now },
+        { id: 5, symbol: 'TSLA', company_name: 'Tesla Inc.', sector: 'Automotive', market_cap: 800000000000, created_at: now, updated_at: now }
+    ];
+    const users = [
+        { id: 1, username: 'admin', email: 'admin@stockpredict.ai', password_hash: '$2b$10$placeholderhash', role: 'admin', is_active: true, last_login: null, created_at: now }
+    ];
+    const system_settings = [
+        { id: 1, setting_key: 'app_name', setting_value: 'StockPredict AI', description: 'Application name displayed in UI', updated_by: null, updated_at: now },
+        { id: 2, setting_key: 'enable_real_time_data', setting_value: 'true', description: '', updated_by: null, updated_at: now }
+    ];
+    const admin_logs = [];
+    const predictions = [];
+    const historical_data = [];
+    // Seed 90 days of synthetic historical data for AAPL (id 1)
+    const seedDays = 90;
+    let price = 150;
+    for (let i = seedDays; i >= 1; i--) {
+        const date = new Date(now);
+        date.setDate(now.getDate() - i);
+        const vol = 100000000 + Math.floor(Math.random() * 5000000);
+        const change = (Math.random() - 0.5) * 2; // -1 to +1
+        price = Math.max(50, price + change);
+        const open = price + (Math.random() - 0.5);
+        const high = Math.max(open, price) + Math.random();
+        const low = Math.min(open, price) - Math.random();
+        historical_data.push({
+            id: nextId(),
+            stock_id: 1,
+            date: date.toISOString().split('T')[0],
+            open_price: Number(open.toFixed(2)),
+            high_price: Number(high.toFixed(2)),
+            low_price: Number(low.toFixed(2)),
+            close_price: Number(price.toFixed(2)),
+            volume: vol,
+            adj_close: Number(price.toFixed(2)),
+            created_at: date
+        });
+    }
+
+    const like = (a, b) => a.toLowerCase().includes(b.toLowerCase());
+
+    return {
+        async execute(query, params = []) {
+            const q = query.trim();
+            // Basic health check
+            if (q === 'SELECT 1') return [[{ 1: 1 }]];
+
+            // Counts
+            if (q.includes('SELECT COUNT(*) as count FROM stocks')) return [[{ count: stocks.length }]];
+            if (q.includes('SELECT COUNT(*) as count FROM predictions')) return [[{ count: predictions.length }]];
+            if (q.includes('SELECT COUNT(*) as count FROM users')) return [[{ count: users.length }]];
+
+            // Stock id by symbol
+            if ((q.startsWith('SELECT id FROM stocks') || q.includes('SELECT id FROM stocks')) && q.includes('WHERE symbol = ?')) {
+                const sym = params[0];
+                const stock = stocks.find(s => s.symbol === sym);
+                return [stock ? [{ id: stock.id }] : []];
+            }
+
+            // Stocks listing with optional WHERE and LIMIT/OFFSET
+            if (q.startsWith('SELECT * FROM stocks')) {
+                let result = [...stocks];
+                if (q.includes('WHERE sector = ?')) {
+                    const sector = params[0];
+                    result = result.filter(s => (s.sector || null) === sector);
+                }
+                if (q.includes('WHERE symbol = ?')) {
+                    const sym = params[0];
+                    result = result.filter(s => s.symbol === sym);
+                }
+                // LIMIT/OFFSET not strictly needed for demo
+                return [result];
+            }
+
+            // Insert stock
+            if (q.startsWith('INSERT INTO stocks')) {
+                const [symbol, company_name, sector] = params;
+                if (stocks.find(s => s.symbol === symbol)) {
+                    const err = new Error('Duplicate');
+                    err.code = 'ER_DUP_ENTRY';
+                    throw err;
+                }
+                const id = nextId();
+                stocks.push({ id, symbol, company_name, sector: sector || null, market_cap: null, created_at: now, updated_at: now });
+                return [{ insertId: id, affectedRows: 1 }];
+            }
+
+            if (q.startsWith('SELECT * FROM stocks WHERE id = ?')) {
+                const id = params[0];
+                return [[stocks.find(s => s.id === id)].filter(Boolean)];
+            }
+
+            // Historical data ascending
+            if (q.startsWith('SELECT date, open_price, high_price, low_price, close_price, volume, adj_close') && q.includes('FROM historical_data') && q.includes('WHERE stock_id = ?') && q.includes('ORDER BY date ASC')) {
+                const stockId = params[0];
+                const data = historical_data
+                    .filter(h => h.stock_id === stockId)
+                    .sort((a, b) => new Date(a.date) - new Date(b.date));
+                return [data];
+            }
+
+            // Historical data for a stock
+            if (q.startsWith('SELECT * FROM historical_data') && q.includes('WHERE stock_id = ?')) {
+                const stockId = params[0];
+                const data = historical_data.filter(h => h.stock_id === stockId)
+                    .sort((a, b) => new Date(b.date) - new Date(a.date));
+                return [data.slice(0, 30)];
+            }
+
+            // Predictions for a stock
+            if (q.startsWith('SELECT * FROM predictions') && q.includes('WHERE stock_id = ?')) {
+                const stockId = params[0];
+                const data = predictions.filter(p => p.stock_id === stockId)
+                    .sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+                return [data.slice(0, 5)];
+            }
+
+            if (q.startsWith('INSERT INTO predictions')) {
+                const [stock_id, prediction_date, predicted_price, confidence_score, prediction_type, algorithm_used] = params;
+                predictions.push({ id: nextId(), stock_id, prediction_date, predicted_price, confidence_score, prediction_type, algorithm_used, created_at: new Date() });
+                return [{ insertId: predictions[predictions.length - 1].id, affectedRows: 1 }];
+            }
+
+            // Predictions join by symbol
+            if (q.startsWith('SELECT p.*, s.symbol, s.company_name FROM predictions p')) {
+                const sym = params[0];
+                const stock = stocks.find(s => s.symbol === sym);
+                const data = (stock ? predictions.filter(p => p.stock_id === stock.id) : []).map(p => ({ ...p, symbol: sym, company_name: stock?.company_name }));
+                return [data];
+            }
+
+            // Users admin queries
+            if (q.includes('FROM users') && q.includes('WHERE username = ?')) {
+                const username = params[0];
+                const role = 'admin';
+                return [users.filter(u => u.username === username && u.role === role)];
+            }
+            if (q.startsWith('UPDATE users SET last_login = CURRENT_TIMESTAMP WHERE id = ?')) {
+                const id = params[0];
+                const user = users.find(u => u.id === Number(id));
+                if (user) user.last_login = new Date();
+                return [{ affectedRows: user ? 1 : 0 }];
+            }
+            if (q.startsWith('SELECT id, username, email, role, is_active, last_login, created_at FROM users')) {
+                return [users];
+            }
+            if (q.startsWith('UPDATE users SET')) {
+                const id = Number(params.at(-1));
+                const user = users.find(u => u.id === id);
+                if (!user) return [{ affectedRows: 0 }];
+                if (q.includes('is_active = ?')) user.is_active = !!params[0];
+                if (q.includes('role = ?')) user.role = params[q.includes('is_active = ?') ? 1 : 0];
+                return [{ affectedRows: 1 }];
+            }
+
+            // Admin logs
+            if (q.startsWith('INSERT INTO admin_logs')) {
+                const [admin_id, action, target_table, target_id, details, ip] = params;
+                admin_logs.push({ id: nextId(), admin_id, action, target_table, target_id, details, ip_address: ip, created_at: new Date() });
+                return [{ affectedRows: 1, insertId: admin_logs[admin_logs.length - 1].id }];
+            }
+            if (q.startsWith('SELECT al.*, u.username FROM admin_logs al')) {
+                const data = admin_logs.map(l => ({ ...l, username: users.find(u => u.id === l.admin_id)?.username || 'admin' }))
+                    .sort((a, b) => new Date(b.created_at) - new Date(a.created_at))
+                    .slice(0, 20);
+                return [data];
+            }
+
+            // Settings
+            if (q.startsWith('SELECT * FROM system_settings')) return [system_settings.sort((a,b)=>a.setting_key.localeCompare(b.setting_key))];
+            if (q.startsWith('UPDATE system_settings SET setting_value = ?, updated_by = ? WHERE setting_key = ?')) {
+                const [value, updated_by, key] = params;
+                const s = system_settings.find(s => s.setting_key === key);
+                if (!s) return [{ affectedRows: 0 }];
+                s.setting_value = String(value);
+                s.updated_by = updated_by;
+                s.updated_at = new Date();
+                return [{ affectedRows: 1 }];
+            }
+
+            // Delete stock
+            if (q.startsWith('DELETE FROM stocks WHERE id = ?')) {
+                const id = Number(params[0]);
+                const idx = stocks.findIndex(s => s.id === id);
+                if (idx >= 0) stocks.splice(idx, 1);
+                return [{ affectedRows: idx >= 0 ? 1 : 0 }];
+            }
+
+            console.warn('DEMO DB: Unhandled query, returning empty set:', q);
+            return [[]];
+        }
+    };
+}
+
 async function initializeDatabase() {
     try {
+        if (DEMO_MODE_REQUESTED) {
+            db = createDemoDb();
+            return;
+        }
+
         console.log('🔌 Connecting to MySQL database...');
         db = await mysql.createPool(dbConfig);
-        
         // Test the connection
         const connection = await db.getConnection();
         console.log('✅ Database connected successfully');
         connection.release();
-        
         // Initialize database schema if needed
         await initializeSchema();
         
     } catch (error) {
         console.error('❌ Database connection failed:', error.message);
-        console.log('💡 Make sure MySQL is running and database exists');
-        process.exit(1);
+        console.log('💡 Falling back to DEMO MODE (in-memory data). To use MySQL, start the DB and unset DEMO_MODE.');
+        db = createDemoDb();
     }
 }
 
@@ -633,30 +845,36 @@ app.put('/api/admin/settings/:key', authenticateToken, requireAdmin, async (req,
  * ===========================================
  */
 
-// Google OAuth login route
-app.get('/api/auth/google',
-    passport.authenticate('google', { scope: ['profile', 'email'] })
-);
+// Google OAuth login route (only if configured)
+if (isGoogleAuthConfigured) {
+    app.get('/api/auth/google',
+        passport.authenticate('google', { scope: ['profile', 'email'] })
+    );
 
-// Google OAuth callback route
-app.get('/api/auth/google/callback',
-    passport.authenticate('google', { failureRedirect: '/login' }),
-    (req, res) => {
-        // Successful authentication, redirect or send token
-        const token = jwt.sign(
-            { 
-                id: req.user.googleId, 
-                email: req.user.email,
-                name: req.user.name 
-            },
-            JWT_SECRET,
-            { expiresIn: '24h' }
-        );
-        
-        // Redirect to frontend with token
-        res.redirect(`http://localhost:3000/auth/success?token=${token}`);
-    }
-);
+    // Google OAuth callback route
+    app.get('/api/auth/google/callback',
+        passport.authenticate('google', { failureRedirect: '/login' }),
+        (req, res) => {
+            const token = jwt.sign(
+                { 
+                    id: req.user.googleId, 
+                    email: req.user.email,
+                    name: req.user.name 
+                },
+                JWT_SECRET,
+                { expiresIn: '24h' }
+            );
+            res.redirect(`http://localhost:3000/auth/success?token=${token}`);
+        }
+    );
+} else {
+    app.get('/api/auth/google', (req, res) => {
+        res.status(503).json({ success: false, error: 'Google OAuth not configured' });
+    });
+    app.get('/api/auth/google/callback', (req, res) => {
+        res.status(503).json({ success: false, error: 'Google OAuth not configured' });
+    });
+}
 
 // Get current user info
 app.get('/api/auth/user', authenticateToken, (req, res) => {
@@ -927,13 +1145,61 @@ app.post('/api/predict/:symbol', async (req, res) => {
                 error: 'Insufficient historical data for prediction (minimum 50 data points required)'
             });
         }
-        
+
+        // Fast path in DEMO MODE: use moving average prediction without ML
+        if (DEMO_MODE_ACTIVE) {
+            const window = Math.min(5, historicalData.length);
+            const recent = historicalData.slice(-window);
+            const sum = recent.reduce((acc, d) => acc + parseFloat(d.close_price), 0);
+            const currentPrice = parseFloat(historicalData[historicalData.length - 1].close_price);
+            const predictedPrice = sum / window;
+            const priceVolatility = stockSorter ? 0 : 0; // not used here
+            const priceDiff = Math.abs(predictedPrice - currentPrice);
+            const confidence = Math.max(0, Math.min(100, 100 - (priceDiff / currentPrice * 100)));
+
+            const predictionDate = new Date();
+            predictionDate.setDate(predictionDate.getDate() + days_ahead);
+            await db.execute(
+                `INSERT INTO predictions 
+                 (stock_id, prediction_date, predicted_price, confidence_score, prediction_type, algorithm_used)
+                 VALUES (?, ?, ?, ?, ?, ?)`,
+                [
+                    stockId,
+                    predictionDate.toISOString().split('T')[0],
+                    Number(predictedPrice.toFixed(2)),
+                    Number(confidence.toFixed(2)),
+                    days_ahead <= 1 ? 'short_term' : days_ahead <= 7 ? 'medium_term' : 'long_term',
+                    'moving_average_demo'
+                ]
+            );
+
+            return res.json({
+                success: true,
+                data: {
+                    symbol: symbol,
+                    prediction: {
+                        success: true,
+                        predictedPrice: Number(predictedPrice.toFixed(2)),
+                        confidence: Number(confidence.toFixed(2)),
+                        currentPrice: currentPrice,
+                        priceChange: Number((predictedPrice - currentPrice).toFixed(2)),
+                        priceChangePercent: Number(((predictedPrice - currentPrice) / currentPrice * 100).toFixed(2)),
+                        daysAhead: days_ahead,
+                        algorithm: 'Moving Average (demo)',
+                        features: [] ,
+                        timestamp: new Date().toISOString()
+                    },
+                    modelInfo: { algorithm: 'Moving Average (demo)', isTrained: true }
+                }
+            });
+        }
+
         // Train model if not trained or retrain requested
         if (!randomForest.isTrained || retrain) {
             console.log('🌲 Training Random Forest model...');
             const trainingResult = randomForest.train(historicalData);
             
-            if (!trainingResult.success) {
+            if (trainingResult.success === false) {
                 return res.status(500).json({
                     success: false,
                     error: 'Failed to train prediction model',
@@ -1161,7 +1427,25 @@ app.post('/api/fetch-realtime/:symbol', async (req, res) => {
         
         console.log(`🌐 Fetching real-time data for ${symbol} from Ninja API...`);
         
-        // Fetch from Ninja API
+        // In demo mode or missing API key, return synthetic data
+        if (DEMO_MODE_ACTIVE || !process.env.NINJA_API_KEY) {
+            const price = 100 + Math.random() * 50;
+            const quote = {
+                symbol: symbol.toUpperCase(),
+                price: Number(price.toFixed(2)),
+                open: Number((price + (Math.random() - 0.5)).toFixed(2)),
+                high: Number((price + Math.random()).toFixed(2)),
+                low: Number((price - Math.random()).toFixed(2)),
+                volume: 1000000 + Math.floor(Math.random() * 500000),
+                change: Number(((Math.random() - 0.5) * 2).toFixed(2)),
+                changePercent: Number(((Math.random() - 0.5) * 2).toFixed(2)),
+                marketCap: null,
+                timestamp: new Date().toISOString()
+            };
+            return res.json({ success: true, data: quote });
+        }
+
+        // Fetch from Ninja API in non-demo mode
         const quote = await ninjaAPI.getStockQuote(symbol);
         
         if (!quote) {
@@ -1277,7 +1561,7 @@ app.get('/api/model/info', (req, res) => {
  * Daily task to update stock data
  * Runs every day at 6 PM (after market close)
  */
-cron.schedule('0 18 * * 1-5', async () => {
+if (!DEMO_MODE_ACTIVE) cron.schedule('0 18 * * 1-5', async () => {
     console.log('📅 Running daily stock data update...');
     
     try {
@@ -1358,9 +1642,10 @@ async function startServer() {
         app.listen(PORT, () => {
             console.log('\n🚀 Stock Prediction Server Started!');
             console.log(`📡 Server running on http://localhost:${PORT}`);
-            console.log(`🗄️  Database: ${dbConfig.database}`);
+            console.log(`🗄️  Database: ${DEMO_MODE_ACTIVE ? 'DEMO (in-memory)' : dbConfig.database}`);
             console.log(`🌲 Random Forest: ${randomForest.isTrained ? 'Ready' : 'Needs Training'}`);
             console.log(`🔀 Sorting Algorithms: Available`);
+            if (DEMO_MODE_ACTIVE) console.log('🧪 DEMO MODE: Authentication, stocks, and predictions use in-memory data.');
             console.log('\n📋 Available Endpoints:');
             console.log('   GET  /api/health           - Health check');
             console.log('   GET  /api/stocks           - Get all stocks (with sorting)');
@@ -1384,7 +1669,7 @@ async function startServer() {
 process.on('SIGINT', async () => {
     console.log('\n🛑 Shutting down server...');
     
-    if (db) {
+    if (db && !DEMO_MODE_ACTIVE && db.end) {
         await db.end();
         console.log('📡 Database connection closed');
     }
