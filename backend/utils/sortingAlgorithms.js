@@ -47,7 +47,19 @@ export class StockSorter {
             
             // Percentage change (if available)
             'change_asc': (a, b) => parseFloat(a.change_percent || 0) - parseFloat(b.change_percent || 0),
-            'change_desc': (a, b) => parseFloat(b.change_percent || 0) - parseFloat(a.change_percent || 0)
+            'change_desc': (a, b) => parseFloat(b.change_percent || 0) - parseFloat(a.change_percent || 0),
+
+            // Predicted gain (percent) if attached to items
+            'predicted_gain_desc': (a, b) => {
+                const ap = parseFloat(a.predicted_change_percent ?? a.predictedGainPercent ?? 0);
+                const bp = parseFloat(b.predicted_change_percent ?? b.predictedGainPercent ?? 0);
+                return bp - ap;
+            },
+            'predicted_gain_asc': (a, b) => {
+                const ap = parseFloat(a.predicted_change_percent ?? a.predictedGainPercent ?? 0);
+                const bp = parseFloat(b.predicted_change_percent ?? b.predictedGainPercent ?? 0);
+                return ap - bp;
+            }
         };
     }
 
@@ -333,7 +345,8 @@ export class StockSorter {
             alphabetical: ['symbol_asc', 'symbol_desc', 'name_asc', 'name_desc'],
             sector: ['sector_asc', 'sector_desc'],
             date: ['date_asc', 'date_desc'],
-            change: ['change_asc', 'change_desc']
+            change: ['change_asc', 'change_desc'],
+            prediction: ['predicted_gain_desc', 'predicted_gain_asc']
         };
     }
 

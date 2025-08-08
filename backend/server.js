@@ -160,7 +160,32 @@ function createDemoDb() {
         { id: 2, symbol: 'GOOGL', company_name: 'Alphabet Inc.', sector: 'Technology', market_cap: 1800000000000, created_at: now, updated_at: now },
         { id: 3, symbol: 'MSFT', company_name: 'Microsoft Corporation', sector: 'Technology', market_cap: 2900000000000, created_at: now, updated_at: now },
         { id: 4, symbol: 'AMZN', company_name: 'Amazon.com Inc.', sector: 'E-commerce', market_cap: 1600000000000, created_at: now, updated_at: now },
-        { id: 5, symbol: 'TSLA', company_name: 'Tesla Inc.', sector: 'Automotive', market_cap: 800000000000, created_at: now, updated_at: now }
+        { id: 5, symbol: 'TSLA', company_name: 'Tesla Inc.', sector: 'Automotive', market_cap: 800000000000, created_at: now, updated_at: now },
+        { id: 6, symbol: 'NVDA', company_name: 'NVIDIA Corporation', sector: 'Technology', market_cap: 2500000000000, created_at: now, updated_at: now },
+        { id: 7, symbol: 'META', company_name: 'Meta Platforms Inc.', sector: 'Technology', market_cap: 1000000000000, created_at: now, updated_at: now },
+        { id: 8, symbol: 'NFLX', company_name: 'Netflix Inc.', sector: 'Entertainment', market_cap: 200000000000, created_at: now, updated_at: now },
+        { id: 9, symbol: 'DIS', company_name: 'The Walt Disney Company', sector: 'Entertainment', market_cap: 180000000000, created_at: now, updated_at: now },
+        { id: 10, symbol: 'V', company_name: 'Visa Inc.', sector: 'Financial Services', market_cap: 500000000000, created_at: now, updated_at: now },
+        { id: 11, symbol: 'MA', company_name: 'Mastercard Incorporated', sector: 'Financial Services', market_cap: 450000000000, created_at: now, updated_at: now },
+        { id: 12, symbol: 'JPM', company_name: 'JPMorgan Chase & Co.', sector: 'Financial Services', market_cap: 450000000000, created_at: now, updated_at: now },
+        { id: 13, symbol: 'BAC', company_name: 'Bank of America Corporation', sector: 'Financial Services', market_cap: 300000000000, created_at: now, updated_at: now },
+        { id: 14, symbol: 'XOM', company_name: 'Exxon Mobil Corporation', sector: 'Energy', market_cap: 450000000000, created_at: now, updated_at: now },
+        { id: 15, symbol: 'CVX', company_name: 'Chevron Corporation', sector: 'Energy', market_cap: 300000000000, created_at: now, updated_at: now },
+        { id: 16, symbol: 'KO', company_name: 'The Coca-Cola Company', sector: 'Consumer Defensive', market_cap: 260000000000, created_at: now, updated_at: now },
+        { id: 17, symbol: 'PEP', company_name: 'PepsiCo, Inc.', sector: 'Consumer Defensive', market_cap: 240000000000, created_at: now, updated_at: now },
+        { id: 18, symbol: 'PG', company_name: 'Procter & Gamble Company', sector: 'Consumer Defensive', market_cap: 350000000000, created_at: now, updated_at: now },
+        { id: 19, symbol: 'INTC', company_name: 'Intel Corporation', sector: 'Technology', market_cap: 160000000000, created_at: now, updated_at: now },
+        { id: 20, symbol: 'AMD', company_name: 'Advanced Micro Devices, Inc.', sector: 'Technology', market_cap: 180000000000, created_at: now, updated_at: now },
+        { id: 21, symbol: 'ORCL', company_name: 'Oracle Corporation', sector: 'Technology', market_cap: 300000000000, created_at: now, updated_at: now },
+        { id: 22, symbol: 'IBM', company_name: 'International Business Machines', sector: 'Technology', market_cap: 150000000000, created_at: now, updated_at: now },
+        { id: 23, symbol: 'ADBE', company_name: 'Adobe Inc.', sector: 'Technology', market_cap: 250000000000, created_at: now, updated_at: now },
+        { id: 24, symbol: 'CRM', company_name: 'Salesforce, Inc.', sector: 'Technology', market_cap: 230000000000, created_at: now, updated_at: now },
+        { id: 25, symbol: 'PYPL', company_name: 'PayPal Holdings, Inc.', sector: 'Financial Services', market_cap: 80000000000, created_at: now, updated_at: now },
+        { id: 26, symbol: 'SQ', company_name: 'Block, Inc.', sector: 'Financial Services', market_cap: 50000000000, created_at: now, updated_at: now },
+        { id: 27, symbol: 'SHOP', company_name: 'Shopify Inc.', sector: 'Technology', market_cap: 80000000000, created_at: now, updated_at: now },
+        { id: 28, symbol: 'UBER', company_name: 'Uber Technologies, Inc.', sector: 'Technology', market_cap: 140000000000, created_at: now, updated_at: now },
+        { id: 29, symbol: 'LYFT', company_name: 'Lyft, Inc.', sector: 'Technology', market_cap: 5000000000, created_at: now, updated_at: now },
+        { id: 30, symbol: 'NKE', company_name: 'NIKE, Inc.', sector: 'Consumer Cyclical', market_cap: 150000000000, created_at: now, updated_at: now }
     ];
     const users = [
         { id: 1, username: 'admin', email: 'admin@stockpredict.ai', password_hash: '$2b$10$placeholderhash', role: 'admin', is_active: true, last_login: null, created_at: now }
@@ -172,30 +197,40 @@ function createDemoDb() {
     const admin_logs = [];
     const predictions = [];
     const historical_data = [];
-    // Seed 90 days of synthetic historical data for AAPL (id 1)
+    // Seed 90 days of synthetic historical data for all stocks
     const seedDays = 90;
-    let price = 150;
-    for (let i = seedDays; i >= 1; i--) {
-        const date = new Date(now);
-        date.setDate(now.getDate() - i);
-        const vol = 100000000 + Math.floor(Math.random() * 5000000);
-        const change = (Math.random() - 0.5) * 2; // -1 to +1
-        price = Math.max(50, price + change);
-        const open = price + (Math.random() - 0.5);
-        const high = Math.max(open, price) + Math.random();
-        const low = Math.min(open, price) - Math.random();
-        historical_data.push({
-            id: nextId(),
-            stock_id: 1,
-            date: date.toISOString().split('T')[0],
-            open_price: Number(open.toFixed(2)),
-            high_price: Number(high.toFixed(2)),
-            low_price: Number(low.toFixed(2)),
-            close_price: Number(price.toFixed(2)),
-            volume: vol,
-            adj_close: Number(price.toFixed(2)),
-            created_at: date
-        });
+    const basePrices = {
+        'AAPL': 150, 'GOOGL': 120, 'MSFT': 320, 'AMZN': 140, 'TSLA': 220,
+        'NVDA': 450, 'META': 300, 'NFLX': 400, 'DIS': 95, 'V': 250,
+        'MA': 420, 'JPM': 180, 'BAC': 30, 'XOM': 110, 'CVX': 160,
+        'KO': 60, 'PEP': 180, 'PG': 150, 'INTC': 35, 'AMD': 120,
+        'ORCL': 125, 'IBM': 135, 'ADBE': 550, 'CRM': 220, 'PYPL': 70,
+        'SQ': 65, 'SHOP': 65, 'UBER': 70, 'LYFT': 12, 'NKE': 95
+    };
+    for (const s of stocks) {
+        let price = basePrices[s.symbol] || 100;
+        for (let i = seedDays; i >= 1; i--) {
+            const date = new Date(now);
+            date.setDate(now.getDate() - i);
+            const vol = 1000000 + Math.floor(Math.random() * 5000000);
+            const change = (Math.random() - 0.5) * (price > 200 ? 4 : 2);
+            price = Math.max(5, price + change);
+            const open = price + (Math.random() - 0.5) * 1.5;
+            const high = Math.max(open, price) + Math.random() * 1.5;
+            const low = Math.min(open, price) - Math.random() * 1.5;
+            historical_data.push({
+                id: nextId(),
+                stock_id: s.id,
+                date: date.toISOString().split('T')[0],
+                open_price: Number(open.toFixed(2)),
+                high_price: Number(high.toFixed(2)),
+                low_price: Number(low.toFixed(2)),
+                close_price: Number(price.toFixed(2)),
+                volume: vol,
+                adj_close: Number(price.toFixed(2)),
+                created_at: date
+            });
+        }
     }
 
     const like = (a, b) => a.toLowerCase().includes(b.toLowerCase());
@@ -984,6 +1019,45 @@ app.get('/api/stocks', async (req, res) => {
     }
 });
 
+// Compute 1-day predictions for all stocks and return sorted by predicted gain desc
+app.get('/api/stocks/predicted-gainers', async (req, res) => {
+    try {
+        const [stocks] = await db.execute('SELECT * FROM stocks');
+        const results = [];
+
+        for (const stock of stocks) {
+            const [historicalData] = await db.execute(
+                `SELECT date, open_price, high_price, low_price, close_price, volume, adj_close
+                 FROM historical_data 
+                 WHERE stock_id = ? 
+                 ORDER BY date ASC`,
+                [stock.id]
+            );
+            if (historicalData.length < 50) continue;
+
+            if (!randomForest.isTrained) {
+                randomForest.train(historicalData);
+            }
+
+            const predictionResult = randomForest.predict(historicalData, 1);
+            if (predictionResult.success) {
+                results.push({
+                    ...stock,
+                    predicted_price: predictionResult.predictedPrice,
+                    predicted_change_percent: predictionResult.priceChangePercent,
+                    predicted_confidence: predictionResult.confidence
+                });
+            }
+        }
+
+        const sorted = results.sort((a, b) => parseFloat(b.predicted_change_percent || 0) - parseFloat(a.predicted_change_percent || 0));
+        res.json({ success: true, data: sorted });
+    } catch (error) {
+        console.error('❌ Error computing predicted gainers:', error);
+        res.status(500).json({ success: false, error: 'Failed to compute predicted gainers', details: error.message });
+    }
+});
+
 /**
  * GET /api/stocks/:symbol
  * Get specific stock information with recent data
@@ -1146,55 +1220,7 @@ app.post('/api/predict/:symbol', async (req, res) => {
             });
         }
 
-        // Fast path in DEMO MODE: use moving average prediction without ML
-        if (DEMO_MODE_ACTIVE) {
-            const window = Math.min(5, historicalData.length);
-            const recent = historicalData.slice(-window);
-            const sum = recent.reduce((acc, d) => acc + parseFloat(d.close_price), 0);
-            const currentPrice = parseFloat(historicalData[historicalData.length - 1].close_price);
-            const predictedPrice = sum / window;
-            const priceVolatility = stockSorter ? 0 : 0; // not used here
-            const priceDiff = Math.abs(predictedPrice - currentPrice);
-            const confidence = Math.max(0, Math.min(100, 100 - (priceDiff / currentPrice * 100)));
-
-            const predictionDate = new Date();
-            predictionDate.setDate(predictionDate.getDate() + days_ahead);
-            await db.execute(
-                `INSERT INTO predictions 
-                 (stock_id, prediction_date, predicted_price, confidence_score, prediction_type, algorithm_used)
-                 VALUES (?, ?, ?, ?, ?, ?)`,
-                [
-                    stockId,
-                    predictionDate.toISOString().split('T')[0],
-                    Number(predictedPrice.toFixed(2)),
-                    Number(confidence.toFixed(2)),
-                    days_ahead <= 1 ? 'short_term' : days_ahead <= 7 ? 'medium_term' : 'long_term',
-                    'moving_average_demo'
-                ]
-            );
-
-            return res.json({
-                success: true,
-                data: {
-                    symbol: symbol,
-                    prediction: {
-                        success: true,
-                        predictedPrice: Number(predictedPrice.toFixed(2)),
-                        confidence: Number(confidence.toFixed(2)),
-                        currentPrice: currentPrice,
-                        priceChange: Number((predictedPrice - currentPrice).toFixed(2)),
-                        priceChangePercent: Number(((predictedPrice - currentPrice) / currentPrice * 100).toFixed(2)),
-                        daysAhead: days_ahead,
-                        algorithm: 'Moving Average (demo)',
-                        features: [] ,
-                        timestamp: new Date().toISOString()
-                    },
-                    modelInfo: { algorithm: 'Moving Average (demo)', isTrained: true }
-                }
-            });
-        }
-
-        // Train model if not trained or retrain requested
+        // Use Random Forest (class internally falls back to moving average if RF fails)
         if (!randomForest.isTrained || retrain) {
             console.log('🌲 Training Random Forest model...');
             const trainingResult = randomForest.train(historicalData);
@@ -1385,6 +1411,49 @@ app.get('/api/sort/algorithms/benchmark', async (req, res) => {
             error: 'Failed to run benchmark',
             details: error.message
         });
+    }
+});
+
+/**
+ * GET /api/stocks/predicted-gainers
+ * Compute 1-day predictions for all stocks and return sorted by predicted gain desc
+ */
+app.get('/api/stocks/predicted-gainers', async (req, res) => {
+    try {
+        const [stocks] = await db.execute('SELECT * FROM stocks');
+        const results = [];
+
+        for (const stock of stocks) {
+            const [historicalData] = await db.execute(
+                `SELECT date, open_price, high_price, low_price, close_price, volume, adj_close
+                 FROM historical_data 
+                 WHERE stock_id = ? 
+                 ORDER BY date ASC`,
+                [stock.id]
+            );
+            if (historicalData.length < 50) continue;
+
+            if (!randomForest.isTrained) {
+                const trainingResult = randomForest.train(historicalData);
+                // Even if RF fails, class enables fallback
+            }
+
+            const predictionResult = randomForest.predict(historicalData, 1);
+            if (predictionResult.success) {
+                results.push({
+                    ...stock,
+                    predicted_price: predictionResult.predictedPrice,
+                    predicted_change_percent: predictionResult.priceChangePercent,
+                    predicted_confidence: predictionResult.confidence
+                });
+            }
+        }
+
+        const sorted = results.sort((a, b) => parseFloat(b.predicted_change_percent || 0) - parseFloat(a.predicted_change_percent || 0));
+        res.json({ success: true, data: sorted });
+    } catch (error) {
+        console.error('❌ Error computing predicted gainers:', error);
+        res.status(500).json({ success: false, error: 'Failed to compute predicted gainers', details: error.message });
     }
 });
 
