@@ -22,7 +22,6 @@ const StockList = ({ stocks, loading, error, onFetchStocks, serverStatus }) => {
   const [sortBy, setSortBy] = useState('symbol_asc');
   const [algorithm, setAlgorithm] = useState('smart');
   const [localLoading, setLocalLoading] = useState(false);
-  const [sortCriteria, setSortCriteria] = useState({});
   const [sortMetrics, setSortMetrics] = useState(null);
 
   // Fetch sort criteria on component mount
@@ -44,7 +43,8 @@ const StockList = ({ stocks, loading, error, onFetchStocks, serverStatus }) => {
     try {
       const response = await axios.get('/api/sort/criteria');
       if (response.data.success) {
-        setSortCriteria(response.data.data);
+        // Data available if needed in future; not stored to avoid unused var warning
+        void response.data.data;
       }
     } catch (error) {
       console.error('Error fetching sort criteria:', error);

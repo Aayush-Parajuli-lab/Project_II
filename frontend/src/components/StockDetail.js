@@ -11,7 +11,7 @@
  * - Technical indicators
  */
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import axios from 'axios';
 
@@ -21,13 +21,7 @@ const StockDetail = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
-  useEffect(() => {
-    if (symbol) {
-      fetchStockDetail();
-    }
-  }, [symbol]);
-
-  const fetchStockDetail = async () => {
+  const fetchStockDetail = useCallback(async () => {
     try {
       setLoading(true);
       const response = await axios.get(`/api/stocks/${symbol}`);
@@ -43,7 +37,13 @@ const StockDetail = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [symbol]);
+
+  useEffect(() => {
+    if (symbol) {
+      fetchStockDetail();
+    }
+  }, [symbol, fetchStockDetail]);
 
   const generatePrediction = async () => {
     try {

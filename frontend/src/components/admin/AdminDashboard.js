@@ -4,7 +4,7 @@
  * Main admin dashboard with system statistics and management tools
  */
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import axios from 'axios';
 
@@ -14,16 +14,7 @@ const AdminDashboard = ({ adminAuth }) => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
-  // Redirect if not authenticated
-  useEffect(() => {
-    if (!adminAuth.isAuthenticated) {
-      navigate('/admin/login');
-      return;
-    }
-    fetchDashboardData();
-  }, [adminAuth.isAuthenticated, navigate]);
-
-  const fetchDashboardData = async () => {
+  const fetchDashboardData = useCallback(async () => {
     try {
       setLoading(true);
       const response = await axios.get('/api/admin/dashboard', {
@@ -44,7 +35,16 @@ const AdminDashboard = ({ adminAuth }) => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [adminAuth.token, navigate]);
+
+  // Redirect if not authenticated
+  useEffect(() => {
+    if (!adminAuth.isAuthenticated) {
+      navigate('/admin/login');
+      return;
+    }
+    fetchDashboardData();
+  }, [adminAuth.isAuthenticated, navigate, fetchDashboardData]);
 
   const handleLogout = async () => {
     try {

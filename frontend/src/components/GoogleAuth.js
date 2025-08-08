@@ -1,26 +1,11 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import axios from 'axios';
 
 const GoogleAuth = ({ onAuthSuccess }) => {
   const [isLoading, setIsLoading] = useState(false);
   const [user, setUser] = useState(null);
 
-  useEffect(() => {
-    // Check if user is already authenticated
-    checkAuthStatus();
-    
-    // Check for auth success callback
-    const urlParams = new URLSearchParams(window.location.search);
-    const token = urlParams.get('token');
-    
-    if (token) {
-      localStorage.setItem('authToken', token);
-      window.history.replaceState({}, document.title, window.location.pathname);
-      checkAuthStatus();
-    }
-  }, []);
-
-  const checkAuthStatus = async () => {
+  const checkAuthStatus = useCallback(async () => {
     const token = localStorage.getItem('authToken');
     if (!token) return;
 
@@ -39,7 +24,22 @@ const GoogleAuth = ({ onAuthSuccess }) => {
       console.error('Auth check failed:', error);
       localStorage.removeItem('authToken');
     }
-  };
+  }, [onAuthSuccess]);
+
+  useEffect(() => {
+    // Check if user is already authenticated
+    checkAuthStatus();
+    
+    // Check for auth success callback
+    const urlParams = new URLSearchParams(window.location.search);
+    const token = urlParams.get('token');
+    
+    if (token) {
+      localStorage.setItem('authToken', token);
+      window.history.replaceState({}, document.title, window.location.pathname);
+      checkAuthStatus();
+    }
+  }, [checkAuthStatus]);
 
   const handleGoogleLogin = () => {
     setIsLoading(true);
