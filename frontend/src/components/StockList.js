@@ -19,10 +19,11 @@ import axios from 'axios';
 
 const StockList = ({ stocks, loading, error, onFetchStocks, serverStatus }) => {
   // Component state
-  const [sortBy, setSortBy] = useState('symbol_asc');
+  const [sortBy, setSortBy] = useState('predicted_gain_desc');
   const [algorithm, setAlgorithm] = useState('smart');
   const [localLoading, setLocalLoading] = useState(false);
   const [sortMetrics, setSortMetrics] = useState(null);
+  const [predictedStocks, setPredictedStocks] = useState(null);
 
   // Fetch sort criteria on component mount
   useEffect(() => {
@@ -63,19 +64,23 @@ const StockList = ({ stocks, loading, error, onFetchStocks, serverStatus }) => {
     try {
       console.log(`🔀 Applying ${algorithm} sort with criteria: ${sortBy}`);
       
+      if (sortBy === 'predicted_gain_desc') {
+        const response = await axios.get('/api/stocks/predicted-gainers');
+        if (response.data.success) {
+          setPredictedStocks(response.data.data);
+          setSortMetrics({ algorithm: 'prediction', executionTime: 0, itemCount: response.data.data.length, sortCriteria: sortBy });
+          return;
+        }
+      }
+
       const response = await axios.post('/api/sort/stocks', {
         sortBy,
         algorithm: algorithm === 'smart' ? 'smart' : algorithm
       });
 
       if (response.data.success) {
-        // Update the parent component with sorted data
-        // Note: In a real app, you might want to use a state management solution
         setSortMetrics(response.data.meta);
-        
-        // Trigger a refresh to get the sorted data
         await onFetchStocks(sortBy, algorithm);
-        
         console.log(`✅ Sorting completed using ${response.data.meta.algorithm} algorithm`);
       }
     } catch (error) {
@@ -311,7 +316,7 @@ const StockList = ({ stocks, loading, error, onFetchStocks, serverStatus }) => {
       </div>
 
       {/* Stocks Table */}
-      {stocks.length === 0 ? (
+      {(predictedStocks ?? stocks).length === 0 ? (
         <div className="card text-center">
           <h3 className="text-muted">📈 No Stocks Available</h3>
           <p className="text-secondary mt-md">
@@ -331,12 +336,13 @@ const StockList = ({ stocks, loading, error, onFetchStocks, serverStatus }) => {
                   <th>🏢 Company</th>
                   <th>🏭 Sector</th>
                   <th>💰 Market Cap</th>
+                  {predictedStocks && <th>🔼 Predicted Change %</th>}
                   <th>📅 Added</th>
                   <th>🔗 Actions</th>
                 </tr>
               </thead>
               <tbody>
-                {stocks.map((stock, index) => (
+                {(predictedStocks ?? stocks).map((stock, index) => (
                   <tr key={stock.id || index} className="fade-in">
                     <td>
                       <Link 
@@ -355,6 +361,11 @@ const StockList = ({ stocks, loading, error, onFetchStocks, serverStatus }) => {
                     <td className="text-success">
                       {formatMarketCap(stock.market_cap)}
                     </td>
+                    {predictedStocks && (
+                      <td className="text-success">
+                        {typeof stock.predicted_change_percent === 'number' ? stock.predicted_change_percent.toFixed(2) : (stock.predicted_change_percent || 'N/A')}%
+                      </td>
+                    )}
                     <td className="text-muted">
                       {stock.created_at ? 
                         new Date(stock.created_at).toLocaleDateString() : 
