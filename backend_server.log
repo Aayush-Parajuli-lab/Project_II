@@ -1,0 +1,23 @@
+🧪 Starting in DEMO MODE with in-memory data. No MySQL required.
+
+🚀 Stock Prediction Server Started!
+📡 Server running on http://localhost:8081
+🗄️  Database: DEMO (in-memory)
+🌲 Random Forest: Needs Training
+🔀 Sorting Algorithms: Available
+🧪 DEMO MODE: Authentication, stocks, and predictions use in-memory data.
+
+📋 Available Endpoints:
+   GET  /api/health           - Health check
+   GET  /api/stocks           - Get all stocks (with sorting)
+   GET  /api/stocks/:symbol   - Get specific stock
+   POST /api/stocks           - Add new stock
+   POST /api/predict/:symbol  - Generate prediction
+   GET  /api/predictions/:symbol - Get predictions
+   POST /api/sort/stocks      - Sort stocks
+   GET  /api/sort/criteria    - Get sort criteria
+   POST /api/fetch-realtime/:symbol - Fetch real-time data
+
+🎯 Ready for frontend connection!
+
+🔮 Generating prediction for AAPL...
