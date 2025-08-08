@@ -18,7 +18,7 @@
  */
 
 import React, { useState, useEffect } from 'react';
-import { BrowserRouter as Router, Routes, Route, Link, useLocation } from 'react-router-dom';
+import { Routes, Route, Link, useLocation } from 'react-router-dom';
 import axios from 'axios';
 import './App.css';
 
@@ -161,86 +161,85 @@ function App() {
 
   return (
     <div className="App">
-      <Router>
-        <div className="app-container">
-          {/* Header/Navigation */}
-          <Header serverStatus={serverStatus} onRefreshHealth={checkServerHealth} />
-          
-          {/* Main Content */}
-          <main className="main-content">
-            <Routes>
-              {/* Home/Stock List Route */}
-              <Route 
-                path="/" 
-                element={
-                  <StockList 
-                    stocks={stocks}
-                    loading={loading}
-                    error={error}
-                    onFetchStocks={fetchStocks}
-                    serverStatus={serverStatus}
-                  />
-                } 
-              />
-              
-              {/* Individual Stock Detail Route */}
-              <Route 
-                path="/stock/:symbol" 
-                element={<StockDetail />} 
-              />
-              
-              {/* Prediction Dashboard Route */}
-              <Route 
-                path="/predictions" 
-                element={<PredictionDashboard />} 
-              />
-              
-              {/* Add New Stock Route */}
-              <Route 
-                path="/add-stock" 
-                element={<AddStock onAddStock={addStock} />} 
-              />
-              
-              {/* Sorting Algorithms Demo Route */}
-              <Route 
-                path="/sorting-demo" 
-                element={<SortingDemo stocks={stocks} />} 
-              />
-              
-              {/* Google Auth Routes */}
-              <Route 
-                path="/auth" 
-                element={<GoogleAuth />} 
-              />
-              <Route 
-                path="/auth/success" 
-                element={<GoogleAuth />} 
-              />
-              
-              {/* Admin Routes */}
-              <Route 
-                path="/admin/login" 
-                element={<AdminLogin onLogin={setAdminAuth} />} 
-              />
-              <Route 
-                path="/admin/dashboard" 
-                element={<AdminDashboard adminAuth={adminAuth} />} 
-              />
-              <Route 
-                path="/admin/users" 
-                element={<AdminUsers adminAuth={adminAuth} />} 
-              />
-              <Route 
-                path="/admin/settings" 
-                element={<AdminSettings adminAuth={adminAuth} />} 
-              />
-            </Routes>
-          </main>
-          
-          {/* Footer */}
-          <Footer />
-        </div>
-      </Router>
+      {/* Router provided by index.js */}
+      <div className="app-container">
+        {/* Header/Navigation */}
+        <Header serverStatus={serverStatus} onRefreshHealth={checkServerHealth} />
+        
+        {/* Main Content */}
+        <main className="main-content">
+          <Routes>
+            {/* Home/Stock List Route */}
+            <Route 
+              path="/" 
+              element={
+                <StockList 
+                  stocks={stocks}
+                  loading={loading}
+                  error={error}
+                  onFetchStocks={fetchStocks}
+                  serverStatus={serverStatus}
+                />
+              } 
+            />
+            
+            {/* Individual Stock Detail Route */}
+            <Route 
+              path="/stock/:symbol" 
+              element={<StockDetail />} 
+            />
+            
+            {/* Prediction Dashboard Route */}
+            <Route 
+              path="/predictions" 
+              element={<PredictionDashboard />} 
+            />
+            
+            {/* Add New Stock Route */}
+            <Route 
+              path="/add-stock" 
+              element={<AddStock onAddStock={addStock} />} 
+            />
+            
+            {/* Sorting Algorithms Demo Route */}
+            <Route 
+              path="/sorting-demo" 
+              element={<SortingDemo stocks={stocks} />} 
+            />
+            
+            {/* Google Auth Routes */}
+            <Route 
+              path="/auth" 
+              element={<GoogleAuth />} 
+            />
+            <Route 
+              path="/auth/success" 
+              element={<GoogleAuth />} 
+            />
+            
+            {/* Admin Routes */}
+            <Route 
+              path="/admin/login" 
+              element={<AdminLogin onLogin={setAdminAuth} />} 
+            />
+            <Route 
+              path="/admin/dashboard" 
+              element={<AdminDashboard adminAuth={adminAuth} />} 
+            />
+            <Route 
+              path="/admin/users" 
+              element={<AdminUsers adminAuth={adminAuth} />} 
+            />
+            <Route 
+              path="/admin/settings" 
+              element={<AdminSettings adminAuth={adminAuth} />} 
+            />
+          </Routes>
+        </main>
+        
+        {/* Footer */}
+        <Footer />
+      </div>
     </div>
   );
 }
