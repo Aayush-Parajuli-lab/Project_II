@@ -14,6 +14,19 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import axios from 'axios';
+import { Line } from 'react-chartjs-2';
+import {
+  Chart as ChartJS,
+  CategoryScale,
+  LinearScale,
+  PointElement,
+  LineElement,
+  Title,
+  Tooltip,
+  Legend
+} from 'chart.js';
+
+ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, Title, Tooltip, Legend);
 
 const StockDetail = () => {
   const { symbol } = useParams();
@@ -130,6 +143,34 @@ const StockDetail = () => {
               <span className="text-success">{stockData?.predictions?.length || 0}</span>
             </div>
           </div>
+        </div>
+
+        <div className="card">
+          <h3 className="card-title">📉 Price History (Last 30)</h3>
+          {stockData?.historicalData?.length ? (
+            <Line
+              data={{
+                labels: stockData.historicalData.map(h => h.date),
+                datasets: [
+                  {
+                    label: 'Close',
+                    data: stockData.historicalData.map(h => h.close_price),
+                    borderColor: '#4CAF50',
+                    backgroundColor: 'rgba(76, 175, 80, 0.2)',
+                    tension: 0.25,
+                    pointRadius: 0
+                  }
+                ]
+              }}
+              options={{
+                responsive: true,
+                plugins: { legend: { display: true } },
+                scales: { x: { display: false } }
+              }}
+            />
+          ) : (
+            <p className="text-secondary">No historical data available.</p>
+          )}
         </div>
 
         <div className="card">
