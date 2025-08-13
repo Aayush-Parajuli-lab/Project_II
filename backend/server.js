@@ -1997,6 +1997,7 @@ async function startServer() {
             console.log('   GET  /api/stocks/:symbol   - Get specific stock');
             console.log('   POST /api/stocks           - Add new stock');
             console.log('   POST /api/predict/:symbol  - Generate prediction');
+            console.log('   POST /api/predict/compose/:symbol - Backfill (Alpha Vantage), fetch live (Ninja), and predict');
             console.log('   GET  /api/predictions/:symbol - Get predictions');
             console.log('   POST /api/sync/historical/:symbol - Backfill historical data (Alpha Vantage)');
             console.log('   POST /api/sort/stocks      - Sort stocks');
