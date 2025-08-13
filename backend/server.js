@@ -30,6 +30,7 @@ import NinjaStockAPI from './services/ninjaStockAPI.js';
 import AlphaVantageAPI from './services/alphaVantageAPI.js';
 import { StockRandomForest } from './algorithms/randomForest.js';
 import { StockSorter } from './utils/sortingAlgorithms.js';
+import { getFirebaseAuth } from './services/firebaseAdmin.js';
 
 // Load environment variables
 dotenv.config();
@@ -1076,92 +1077,53 @@ app.put('/api/admin/settings/:key', authenticateToken, requireAdmin, async (req,
  * ===========================================
  */
 
-// Google OAuth login route (only if configured)
-if (isGoogleAuthConfigured) {
-    app.get('/api/auth/google',
-        passport.authenticate('google', { scope: ['profile', 'email'] })
-    );
-
-    // Google OAuth callback route
-    app.get('/api/auth/google/callback',
-        passport.authenticate('google', { failureRedirect: '/login' }),
-        async (req, res) => {
-            try {
-                // Ensure a local user exists for this Google account
-                const email = req.user.email;
-                const name = req.user.name;
-                const username = (email?.split('@')[0] || name || 'user').toLowerCase();
-
-                // Try fetching by email
-                const [existing] = await db.execute('SELECT id, username, email, role FROM users WHERE email = ?', [email]);
-                let dbUser;
-                if (existing.length > 0) {
-                    dbUser = existing[0];
-                } else {
-                    // Create user with a placeholder password hash
-                    const placeholderHash = await bcrypt.hash('GOOGLE_AUTH', 10);
-                    const [result] = await db.execute(
-                        'INSERT INTO users (username, email, password_hash, role) VALUES (?, ?, ?, ?)',
-                        [username, email, placeholderHash, 'user']
-                    );
-                    dbUser = { id: result.insertId, username, email, role: 'user' };
-                }
-
-                // Issue JWT for the user
-                const token = jwt.sign({ id: dbUser.id, username: dbUser.username, email: dbUser.email, role: dbUser.role }, JWT_SECRET, { expiresIn: '24h' });
-                res.redirect(`http://localhost:3000/auth/success?token=${token}`);
-            } catch (error) {
-                console.error('❌ Google OAuth callback error:', error);
-                res.redirect('http://localhost:3000/login?error=oauth_failed');
-            }
-        }
-    );
-} else {
-    app.get('/api/auth/google', (req, res) => {
-        res.status(503).json({ success: false, error: 'Google OAuth not configured' });
-    });
-    app.get('/api/auth/google/callback', (req, res) => {
-        res.status(503).json({ success: false, error: 'Google OAuth not configured' });
-    });
-}
-
-// Google status endpoint for frontend to detect availability
+// Deprecate Google OAuth endpoints in favor of Firebase
+app.get('/api/auth/google', (req, res) => {
+    res.status(410).json({ success: false, error: 'Google OAuth deprecated. Use Firebase client sign-in.' });
+});
+app.get('/api/auth/google/callback', (req, res) => {
+    res.status(410).json({ success: false, error: 'Google OAuth deprecated. Use Firebase client sign-in.' });
+});
 app.get('/api/auth/google/status', (req, res) => {
-    res.json({ success: true, configured: isGoogleAuthConfigured });
+    res.json({ success: true, configured: false });
 });
 
-// Get current user info
-app.get('/api/auth/user', authenticateToken, (req, res) => {
-    res.json({
-        success: true,
-        data: {
-            user: req.user
-        }
-    });
-});
+// Firebase Authentication login
+app.post('/api/auth/firebase', async (req, res) => {
+    try {
+        const { idToken } = req.body || {};
+        if (!idToken) return res.status(400).json({ success: false, error: 'idToken is required' });
 
-// Logout route
-app.post('/api/auth/logout', (req, res) => {
-    req.logout((err) => {
-        if (err) {
-            return res.status(500).json({
-                success: false,
-                error: 'Error logging out'
-            });
+        const adminAuth = getFirebaseAuth();
+        if (!adminAuth) return res.status(503).json({ success: false, error: 'Firebase Admin not configured on server' });
+
+        const decoded = await adminAuth.verifyIdToken(idToken);
+        const email = decoded.email;
+        const name = decoded.name || decoded.email?.split('@')[0] || 'user';
+        const picture = decoded.picture;
+        const username = (email?.split('@')[0] || name).toLowerCase();
+
+        // Ensure local user exists
+        const [existing] = await db.execute('SELECT id, username, email, role FROM users WHERE email = ?', [email]);
+        let dbUser;
+        if (existing.length > 0) {
+            dbUser = existing[0];
+        } else {
+            const placeholderHash = await bcrypt.hash('FIREBASE_AUTH', 10);
+            const [result] = await db.execute(
+                'INSERT INTO users (username, email, password_hash, role) VALUES (?, ?, ?, ?)',
+                [username, email, placeholderHash, 'user']
+            );
+            dbUser = { id: result.insertId, username, email, role: 'user' };
         }
-        req.session.destroy((err) => {
-            if (err) {
-                return res.status(500).json({
-                    success: false,
-                    error: 'Error destroying session'
-                });
-            }
-            res.json({
-                success: true,
-                message: 'Logged out successfully'
-            });
-        });
-    });
+
+        // Issue app JWT
+        const token = jwt.sign({ id: dbUser.id, username: dbUser.username, email: dbUser.email, role: dbUser.role, picture }, JWT_SECRET, { expiresIn: '24h' });
+        res.json({ success: true, data: { token, user: { ...dbUser, name, email, picture } } });
+    } catch (error) {
+        console.error('❌ Firebase auth error:', error);
+        res.status(401).json({ success: false, error: 'Invalid Firebase token', details: error.message });
+    }
 });
 
 /**

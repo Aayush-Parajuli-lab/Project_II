@@ -1,5 +1,18 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import axios from 'axios';
+import { initializeApp, getApps } from 'firebase/app';
+import { getAuth, GoogleAuthProvider, signInWithPopup } from 'firebase/auth';
+
+const firebaseConfig = {
+  apiKey: process.env.REACT_APP_FIREBASE_API_KEY,
+  authDomain: process.env.REACT_APP_FIREBASE_AUTH_DOMAIN,
+  projectId: process.env.REACT_APP_FIREBASE_PROJECT_ID,
+  appId: process.env.REACT_APP_FIREBASE_APP_ID
+};
+
+if (!getApps().length && firebaseConfig.apiKey) {
+  initializeApp(firebaseConfig);
+}
 
 const GoogleAuth = ({ onAuthSuccess }) => {
   const [isLoading, setIsLoading] = useState(false);
@@ -8,7 +21,6 @@ const GoogleAuth = ({ onAuthSuccess }) => {
   const [formData, setFormData] = useState({ usernameOrEmail: '', password: '', username: '', email: '' });
   const [error, setError] = useState('');
   const [isAdminMode, setIsAdminMode] = useState(false);
-  const [googleAvailable, setGoogleAvailable] = useState(true);
 
   const checkAuthStatus = useCallback(async () => {
     const token = localStorage.getItem('authToken');
@@ -35,7 +47,7 @@ const GoogleAuth = ({ onAuthSuccess }) => {
     // Check if user is already authenticated
     checkAuthStatus();
     
-    // Check for auth success callback
+    // Check for auth success callback (legacy)
     const urlParams = new URLSearchParams(window.location.search);
     const token = urlParams.get('token');
     
@@ -44,18 +56,28 @@ const GoogleAuth = ({ onAuthSuccess }) => {
       window.history.replaceState({}, document.title, window.location.pathname);
       checkAuthStatus();
     }
-
-    // Check Google availability
-    axios.get('/api/auth/google/status')
-      .then(res => setGoogleAvailable(!!res.data?.configured))
-      .catch(() => setGoogleAvailable(false));
   }, [checkAuthStatus]);
 
-  const handleGoogleLogin = () => {
-    setIsLoading(true);
-    // Redirect to Google OAuth (absolute backend URL)
-    const apiBase = (axios.defaults.baseURL || 'http://localhost:8081').replace(/\/$/, '');
-    window.location.assign(`${apiBase}/api/auth/google`);
+  const handleGoogleLogin = async () => {
+    try {
+      setIsLoading(true);
+      const appAuth = getAuth();
+      const provider = new GoogleAuthProvider();
+      const result = await signInWithPopup(appAuth, provider);
+      const idToken = await result.user.getIdToken();
+      const res = await axios.post('/api/auth/firebase', { idToken });
+      if (res.data.success) {
+        localStorage.setItem('authToken', res.data.data.token);
+        await checkAuthStatus();
+      } else {
+        setError(res.data.error || 'Login failed');
+      }
+    } catch (e) {
+      console.error('Firebase Google login failed:', e);
+      setError('Google login failed');
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   const handleLogout = async () => {
@@ -66,7 +88,6 @@ const GoogleAuth = ({ onAuthSuccess }) => {
       window.location.reload();
     } catch (error) {
       console.error('Logout failed:', error);
-      // Still remove token and user on client side
       localStorage.removeItem('authToken');
       setUser(null);
       window.location.reload();
@@ -87,13 +108,11 @@ const GoogleAuth = ({ onAuthSuccess }) => {
     try {
       if (mode === 'login') {
         if (isAdminMode) {
-          // Admin login via /api/admin/login
           const payload = { username: formData.usernameOrEmail, password: formData.password };
           const res = await axios.post('/api/admin/login', payload);
           if (res.data.success) {
             const { token } = res.data.data;
             localStorage.setItem('adminToken', token);
-            // Redirect to Admin Dashboard
             window.location.assign('/admin/dashboard');
             return;
           }
@@ -150,6 +169,8 @@ const GoogleAuth = ({ onAuthSuccess }) => {
       </div>
     );
   }
+
+  const firebaseConfigured = Boolean(firebaseConfig.apiKey);
 
   return (
     <div className="auth-container">
@@ -245,7 +266,7 @@ const GoogleAuth = ({ onAuthSuccess }) => {
             <h4 className="mb-sm">Or continue with</h4>
             <button 
               onClick={handleGoogleLogin} 
-              disabled={isLoading || !googleAvailable}
+              disabled={isLoading || !firebaseConfigured}
               className="google-auth-btn w-full"
             >
               <svg className="google-icon" viewBox="0 0 24 24">
@@ -259,8 +280,8 @@ const GoogleAuth = ({ onAuthSuccess }) => {
 
             <div className="auth-disclaimer mt-md">
               <p>By signing in, you agree to our terms of service and privacy policy.</p>
-              {!googleAvailable && (
-                <p className="text-sm text-warning mt-sm">Google sign-in is not configured on the server.</p>
+              {!firebaseConfigured && (
+                <p className="text-sm text-warning mt-sm">Firebase is not configured in the frontend (.env).</p>
               )}
             </div>
           </div>
