@@ -1094,7 +1094,7 @@ app.post('/api/auth/firebase', async (req, res) => {
         const { idToken } = req.body || {};
         if (!idToken) return res.status(400).json({ success: false, error: 'idToken is required' });
 
-        const adminAuth = getFirebaseAuth();
+        const adminAuth = await getFirebaseAuth();
         if (!adminAuth) return res.status(503).json({ success: false, error: 'Firebase Admin not configured on server' });
 
         const decoded = await adminAuth.verifyIdToken(idToken);
