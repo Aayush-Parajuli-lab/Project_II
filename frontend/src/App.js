@@ -84,6 +84,13 @@ function App() {
     }
   };
 
+  const logoutAdmin = () => {
+    try {
+      localStorage.removeItem('adminToken');
+    } catch {}
+    setAdminAuth({ isAuthenticated: false, token: null, user: null });
+  };
+
   /**
    * Check if backend server is running and healthy
    */
@@ -219,7 +226,7 @@ function App() {
             />
             <Route 
               path="/admin/dashboard" 
-              element={<AdminDashboard adminAuth={adminAuth} />} 
+              element={<AdminDashboard adminAuth={adminAuth} onLogout={logoutAdmin} />} 
             />
             <Route 
               path="/admin/users" 

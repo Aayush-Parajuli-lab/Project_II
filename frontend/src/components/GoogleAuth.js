@@ -53,8 +53,9 @@ const GoogleAuth = ({ onAuthSuccess }) => {
 
   const handleGoogleLogin = () => {
     setIsLoading(true);
-    // Redirect to Google OAuth
-    window.location.href = '/api/auth/google';
+    // Redirect to Google OAuth (absolute backend URL)
+    const apiBase = (axios.defaults.baseURL || 'http://localhost:8081').replace(/\/$/, '');
+    window.location.assign(`${apiBase}/api/auth/google`);
   };
 
   const handleLogout = async () => {
