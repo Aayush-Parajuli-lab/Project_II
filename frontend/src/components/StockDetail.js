@@ -33,6 +33,8 @@ const StockDetail = () => {
   const [stockData, setStockData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [actionError, setActionError] = useState('');
+  const [actionLoading, setActionLoading] = useState(false);
 
   const fetchStockDetail = useCallback(async () => {
     try {
@@ -59,18 +61,40 @@ const StockDetail = () => {
   }, [symbol, fetchStockDetail]);
 
   const generatePrediction = async () => {
+    setActionError('');
+    setActionLoading(true);
     try {
-      const response = await axios.post(`/api/predict/${symbol}`, {
-        days_ahead: 1,
-        retrain: false
-      });
-      
+      const response = await axios.post(`/api/predict/compose/${symbol}`, { days_ahead: 1, retrain: false });
       if (response.data.success) {
-        alert(`Prediction for ${symbol}: $${response.data.data.prediction.predictedPrice}`);
+        const p = response.data.data.prediction;
+        alert(`Prediction for ${symbol}: $${p.predictedPrice} (conf: ${Math.round(p.confidence)}%)\nCurrent: ${response.data.data.currentPrice ?? 'N/A'}`);
+        // Refresh detail to reflect new prediction history
+        await fetchStockDetail();
+      } else {
+        setActionError(response.data.error || 'Prediction failed');
       }
-    } catch (error) {
-      console.error('Error generating prediction:', error);
-      alert('Failed to generate prediction. Make sure there is sufficient historical data.');
+    } catch (err) {
+      console.error('Error generating prediction:', err);
+      setActionError(err.response?.data?.details || err.response?.data?.error || 'Failed to generate prediction.');
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const syncHistorical = async (size = 'compact') => {
+    setActionError('');
+    setActionLoading(true);
+    try {
+      const res = await axios.post(`/api/sync/historical/${symbol}`, { outputSize: size });
+      if (res.data.success) {
+        await fetchStockDetail();
+      } else {
+        setActionError(res.data.error || 'Sync failed');
+      }
+    } catch (err) {
+      setActionError(err.response?.data?.details || err.response?.data?.error || 'Failed to sync historical data');
+    } finally {
+      setActionLoading(false);
     }
   };
 
@@ -107,6 +131,7 @@ const StockDetail = () => {
             <button 
               onClick={generatePrediction}
               className="btn btn-primary"
+              disabled={actionLoading}
             >
               🔮 Generate Prediction
             </button>
@@ -115,6 +140,9 @@ const StockDetail = () => {
             </Link>
           </div>
         </div>
+        {actionError && (
+          <div className="p-md text-danger">{actionError}</div>
+        )}
       </div>
 
       {/* Stock Information */}
@@ -141,6 +169,10 @@ const StockDetail = () => {
             <div className="flex justify-between">
               <span className="text-secondary">Predictions:</span>
               <span className="text-success">{stockData?.predictions?.length || 0}</span>
+            </div>
+            <div className="flex gap-sm">
+              <button onClick={() => syncHistorical('compact')} className="btn btn-outline btn-sm" disabled={actionLoading}>↻ Sync (100 days)</button>
+              <button onClick={() => syncHistorical('full')} className="btn btn-outline btn-sm" disabled={actionLoading}>↻ Sync (Full)</button>
             </div>
           </div>
         </div>
@@ -200,9 +232,13 @@ const StockDetail = () => {
               <button 
                 onClick={generatePrediction}
                 className="btn btn-primary mt-md"
+                disabled={actionLoading}
               >
                 🔮 Generate First Prediction
               </button>
+              <div className="mt-sm">
+                <button onClick={() => syncHistorical('compact')} className="btn btn-outline btn-sm" disabled={actionLoading}>↻ Sync History</button>
+              </div>
             </div>
           )}
         </div>
