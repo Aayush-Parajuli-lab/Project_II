@@ -126,6 +126,24 @@ function App() {
   };
 
   /**
+   * Check if backend server is running and healthy
+   */
+  const checkServerHealth = async () => {
+    try {
+      const response = await axios.get('/api/health');
+      if (response.data.success) {
+        setServerStatus('healthy');
+        console.log('✅ Backend server is healthy');
+      } else {
+        setServerStatus('unhealthy');
+      }
+    } catch (error) {
+      console.error('❌ Backend server health check failed:', error);
+      setServerStatus('offline');
+    }
+  };
+
+  /**
    * Fetch stocks from the backend with optional sorting
    */
   const fetchStocks = async (sortBy = 'symbol_asc', algorithm = 'smart') => {
