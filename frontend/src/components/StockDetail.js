@@ -35,6 +35,7 @@ const StockDetail = () => {
   const [error, setError] = useState(null);
   const [actionError, setActionError] = useState('');
   const [actionLoading, setActionLoading] = useState(false);
+  const [lastPrediction, setLastPrediction] = useState(null);
 
   const fetchStockDetail = useCallback(async () => {
     try {
@@ -67,7 +68,13 @@ const StockDetail = () => {
       const response = await axios.post(`/api/predict/compose/${symbol}`, { days_ahead: 1, retrain: false });
       if (response.data.success) {
         const p = response.data.data.prediction;
-        alert(`Prediction for ${symbol}: $${p.predictedPrice} (conf: ${Math.round(p.confidence)}%)\nCurrent: ${response.data.data.currentPrice ?? 'N/A'}`);
+        const current = response.data.data.currentPrice;
+        setLastPrediction({
+          predictedPrice: p.predictedPrice,
+          confidence: Math.round(p.confidence),
+          currentPrice: current,
+          generatedAt: new Date().toISOString()
+        });
         // Refresh detail to reflect new prediction history
         await fetchStockDetail();
       } else {
@@ -142,6 +149,26 @@ const StockDetail = () => {
         </div>
         {actionError && (
           <div className="p-md text-danger">{actionError}</div>
+        )}
+        {lastPrediction && (
+          <div className="p-md">
+            <div className="card" style={{ borderLeft: '6px solid #4CAF50' }}>
+              <div className="flex justify-between items-center">
+                <div>
+                  <div className="text-secondary text-sm">Predicted Price</div>
+                  <div className="text-3xl text-primary font-weight-bold">${lastPrediction.predictedPrice}</div>
+                </div>
+                <div className="text-right">
+                  <div className="text-secondary text-sm">Confidence</div>
+                  <div className="text-2xl text-success font-weight-bold">{lastPrediction.confidence}%</div>
+                </div>
+              </div>
+              <div className="flex justify-between mt-sm text-sm text-secondary">
+                <div>Current: {lastPrediction.currentPrice != null ? `$${lastPrediction.currentPrice}` : 'N/A'}</div>
+                <div>Generated: {new Date(lastPrediction.generatedAt).toLocaleTimeString()}</div>
+              </div>
+            </div>
+          </div>
         )}
       </div>
 
