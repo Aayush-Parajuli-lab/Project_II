@@ -27,7 +27,6 @@ import StockList from './components/StockList';
 import StockDetail from './components/StockDetail';
 import PredictionDashboard from './components/PredictionDashboard';
 import AddStock from './components/AddStock';
-import SortingDemo from './components/SortingDemo';
 import GoogleAuth from './components/GoogleAuth';
 import AdminLogin from './components/admin/AdminLogin';
 import AdminDashboard from './components/admin/AdminDashboard';
@@ -201,11 +200,7 @@ function App() {
               element={<AddStock onAddStock={addStock} />} 
             />
             
-            {/* Sorting Algorithms Demo Route */}
-            <Route 
-              path="/sorting-demo" 
-              element={<SortingDemo stocks={stocks} />} 
-            />
+
             
             {/* Google Auth Routes */}
             <Route 
@@ -298,12 +293,6 @@ function Header({ serverStatus, onRefreshHealth }) {
             className={`nav-link ${location.pathname === '/add-stock' ? 'active' : ''}`}
           >
             Add Stock
-          </Link>
-          <Link 
-            to="/sorting-demo" 
-            className={`nav-link ${location.pathname === '/sorting-demo' ? 'active' : ''}`}
-          >
-            Algorithms
           </Link>
           <Link 
             to="/auth" 
