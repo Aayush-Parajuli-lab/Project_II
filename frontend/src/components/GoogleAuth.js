@@ -115,6 +115,9 @@ const GoogleAuth = ({ onAuthSuccess }) => {
             localStorage.setItem('adminToken', token);
             window.location.assign('/admin/dashboard');
             return;
+          } else {
+            setError(res.data.error || 'Admin login failed');
+            return;
           }
         } else {
           const payload = formData.usernameOrEmail.includes('@')
@@ -124,6 +127,8 @@ const GoogleAuth = ({ onAuthSuccess }) => {
           if (res.data.success) {
             localStorage.setItem('authToken', res.data.data.token);
             await checkAuthStatus();
+          } else {
+            setError(res.data.error || 'Login failed');
           }
         }
       } else {

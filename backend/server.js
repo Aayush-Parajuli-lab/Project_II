@@ -218,6 +218,8 @@ function createDemoDb() {
     const users = [
         { id: 1, username: 'admin', email: 'admin@stockpredict.ai', password_hash: '$2b$10$placeholderhash', role: 'admin', is_active: true, last_login: null, created_at: now }
     ];
+    // Add a default demo user for quick testing
+    users.push({ id: nextId(), username: 'demo', email: 'demo@example.com', password_hash: 'DEMO', role: 'user', is_active: true, last_login: null, created_at: now });
     const system_settings = [
         { id: 1, setting_key: 'app_name', setting_value: 'StockPredict AI', description: 'Application name displayed in UI', updated_by: null, updated_at: now },
         { id: 2, setting_key: 'enable_real_time_data', setting_value: 'true', description: '', updated_by: null, updated_at: now }
@@ -783,6 +785,10 @@ app.post('/api/auth/login', async (req, res) => {
             valid = await bcrypt.compare(password, user.password_hash);
         } catch (_) {
             valid = false;
+        }
+        // Demo fallback: allow demo/demo123 in demo mode
+        if (!valid && DEMO_MODE_ACTIVE && user.username === 'demo' && password === 'demo123') {
+            valid = true;
         }
         if (!valid) {
             return res.status(401).json({ success: false, error: 'Invalid credentials' });
