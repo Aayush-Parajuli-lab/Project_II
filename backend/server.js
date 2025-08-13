@@ -225,6 +225,19 @@ function createDemoDb() {
     const admin_logs = [];
     const predictions = STATIC_MODE ? loadPredictions() : [];
     const historical_data = [];
+    // Optionally load static stocks
+    const staticStocksPath = path.join(dataDir, 'static_stocks.json');
+    if (fs.existsSync(staticStocksPath)) {
+        try {
+            const arr = JSON.parse(fs.readFileSync(staticStocksPath, 'utf8'));
+            for (const s of arr) {
+                if (!stocks.find(x => x.symbol === s.symbol)) {
+                    stocks.push({ id: nextId(), symbol: s.symbol.toUpperCase(), company_name: s.company_name || s.symbol, sector: s.sector || null, market_cap: s.market_cap || (5e9 + Math.floor(Math.random() * 300e9)), created_at: now, updated_at: now });
+                }
+            }
+        } catch {}
+    }
+
     // Seed 90 days of synthetic historical data for all stocks
     const seedDays = 90;
     const basePrices = {
@@ -259,6 +272,35 @@ function createDemoDb() {
                 created_at: date
             });
         }
+    }
+
+    // Optionally load static historical data and merge
+    const staticHistoryPath = path.join(dataDir, 'static_history.json');
+    if (fs.existsSync(staticHistoryPath)) {
+        try {
+            const arr = JSON.parse(fs.readFileSync(staticHistoryPath, 'utf8'));
+            for (const r of arr) {
+                const sym = (r.symbol || '').toUpperCase();
+                const stock = stocks.find(x => x.symbol === sym);
+                if (!stock) continue;
+                // Avoid duplicates by date
+                const exists = historical_data.find(h => h.stock_id === stock.id && h.date === r.date);
+                if (!exists) {
+                    historical_data.push({
+                        id: nextId(),
+                        stock_id: stock.id,
+                        date: r.date,
+                        open_price: Number(r.open_price ?? r.open ?? 0),
+                        high_price: Number(r.high_price ?? r.high ?? 0),
+                        low_price: Number(r.low_price ?? r.low ?? 0),
+                        close_price: Number(r.close_price ?? r.close ?? 0),
+                        volume: Number(r.volume ?? 0),
+                        adj_close: Number(r.adj_close ?? r.close_price ?? r.close ?? 0),
+                        created_at: new Date(r.date)
+                    });
+                }
+            }
+        } catch {}
     }
 
     // Seed sample predictions for admin dashboard visibility
@@ -1183,17 +1225,27 @@ app.get('/api/stocks', async (req, res) => {
         query += ' LIMIT ? OFFSET ?';
         params.push(parseInt(limit), parseInt(offset));
         
-        const [stocks] = await db.execute(query, params);
+        const [rows] = await db.execute(query, params);
+        // Enrich with synthetic market caps if missing
+        const enriched = rows.map(s => {
+            if (s.market_cap == null || s.market_cap === 0) {
+                const sym = (s.symbol || 'XX');
+                const seed = (sym.charCodeAt(0) || 65) + (sym.charCodeAt(1) || 66);
+                const cap = 5e9 + (seed % 295) * 1e9;
+                return { ...s, market_cap: cap };
+            }
+            return s;
+        });
         
         // Apply sorting if requested
         if (sortBy !== 'none') {
-            const sortResult = stockSorter.smartSort(stocks, sortBy, algorithm === 'smart' ? null : algorithm);
+            const sortResult = stockSorter.smartSort(enriched, sortBy, algorithm === 'smart' ? null : algorithm);
             
             res.json({
                 success: true,
                 data: sortResult.sortedData,
                 meta: {
-                    total: stocks.length,
+                    total: enriched.length,
                     sortedBy: sortBy,
                     algorithm: sortResult.algorithm,
                     executionTime: sortResult.executionTime,
@@ -1204,9 +1256,9 @@ app.get('/api/stocks', async (req, res) => {
         } else {
             res.json({
                 success: true,
-                data: stocks,
+                data: enriched,
                 meta: {
-                    total: stocks.length,
+                    total: enriched.length,
                     limit: parseInt(limit),
                     offset: parseInt(offset)
                 }
@@ -1296,7 +1348,16 @@ app.get('/api/stocks/:symbol', async (req, res) => {
             });
         }
         
-        const stock = stocks[0];
+        const stock = (() => {
+            const s = stocks[0];
+            if (s.market_cap == null || s.market_cap === 0) {
+                const sym = (s.symbol || 'XX');
+                const seed = (sym.charCodeAt(0) || 65) + (sym.charCodeAt(1) || 66);
+                const cap = 5e9 + (seed % 295) * 1e9;
+                return { ...s, market_cap: cap };
+            }
+            return s;
+        })();
         
         // Get recent historical data (last 30 days)
         const [historicalData] = await db.execute(

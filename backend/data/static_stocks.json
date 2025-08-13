@@ -1,0 +1,7 @@
+[
+  { "symbol": "AAPL", "company_name": "Apple Inc.", "sector": "Technology", "market_cap": 2800000000000 },
+  { "symbol": "GOOGL", "company_name": "Alphabet Inc.", "sector": "Technology", "market_cap": 1900000000000 },
+  { "symbol": "MSFT", "company_name": "Microsoft Corporation", "sector": "Technology", "market_cap": 3200000000000 },
+  { "symbol": "TSLA", "company_name": "Tesla, Inc.", "sector": "Automotive", "market_cap": 850000000000 },
+  { "symbol": "NVDA", "company_name": "NVIDIA Corporation", "sector": "Technology", "market_cap": 2500000000000 }
+]
