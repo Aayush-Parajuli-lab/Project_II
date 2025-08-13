@@ -38,6 +38,7 @@ dotenv.config();
 // Demo mode flags
 const DEMO_MODE_REQUESTED = (process.env.DEMO_MODE || '').toString().toLowerCase() === 'true' || process.env.DEMO_MODE === '1';
 let DEMO_MODE_ACTIVE = false;
+const NO_EXTERNAL_APIS = (process.env.NO_EXTERNAL_APIS || '').toString().toLowerCase() === 'true' || process.env.NO_EXTERNAL_APIS === '1';
 
 // Initialize Express app
 const app = express();
@@ -1386,7 +1387,7 @@ app.post('/api/predict/:symbol', async (req, res) => {
         const stockId = stocks[0].id;
         
         // Get historical data for training/prediction
-        let [historicalData] = await db.execute(
+        const [historicalData] = await db.execute(
             `SELECT date, open_price, high_price, low_price, close_price, volume, adj_close
              FROM historical_data 
              WHERE stock_id = ? 
@@ -1395,34 +1396,15 @@ app.post('/api/predict/:symbol', async (req, res) => {
         );
         
         if (historicalData.length < 50) {
-            // Try to backfill using Alpha Vantage (compact ~100 days)
-            try {
-                const records = await alphaAPI.getDailyAdjusted(symbol, 'compact');
-                // Insert missing historical rows
-                for (const r of records) {
-                    await db.execute(
-                        `INSERT IGNORE INTO historical_data 
-                         (stock_id, date, open_price, high_price, low_price, close_price, volume, adj_close)
-                         VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-                        [stockId, r.date, r.open, r.high, r.low, r.close, r.volume || 0, r.adj_close || r.close]
-                    );
-                }
-                // Re-fetch
-                const [refetched] = await db.execute(
-                    `SELECT date, open_price, high_price, low_price, close_price, volume, adj_close
-                     FROM historical_data 
-                     WHERE stock_id = ? 
-                     ORDER BY date ASC`,
-                    [stockId]
-                );
-                historicalData = refetched;
-            } catch (syncErr) {
-                return res.status(400).json({
-                    success: false,
-                    error: 'Insufficient historical data and failed to backfill from Alpha Vantage',
-                    details: syncErr.message
-                });
+            if (NO_EXTERNAL_APIS) {
+                const lastClose = historicalData.at(-1)?.close_price || 100;
+                const predictedPrice = Number((lastClose * (1 + 0.02)).toFixed(2));
+                return res.json({ success: true, data: { symbol, prediction: { success: true, predictedPrice, confidence: 80 }, modelInfo: { mode: 'static' } } });
             }
+            return res.status(400).json({
+                success: false,
+                error: 'Insufficient historical data for prediction (minimum 50 data points required)'
+            });
         }
         
         // Use Random Forest (class internally falls back to moving average if RF fails)
@@ -1495,6 +1477,9 @@ app.post('/api/predict/:symbol', async (req, res) => {
  */
 app.post('/api/sync/historical/:symbol', async (req, res) => {
     try {
+        if (NO_EXTERNAL_APIS) {
+            return res.status(410).json({ success: false, error: 'Historical sync disabled in static mode' });
+        }
         const { symbol } = req.params;
         const { outputSize = 'compact' } = req.body || {};
 
@@ -1868,7 +1853,7 @@ app.get('/api/model/info', (req, res) => {
  * Daily task to update stock data
  * Runs every day at 6 PM (after market close)
  */
-if (!DEMO_MODE_ACTIVE) cron.schedule('0 18 * * 1-5', async () => {
+if (!DEMO_MODE_ACTIVE && !NO_EXTERNAL_APIS) cron.schedule('0 18 * * 1-5', async () => {
     console.log('📅 Running daily stock data update...');
     
     try {
@@ -1961,7 +1946,7 @@ async function startServer() {
             console.log('   POST /api/predict/:symbol  - Generate prediction');
             console.log('   POST /api/predict/compose/:symbol - Backfill (Alpha Vantage), fetch live (Ninja), and predict');
             console.log('   GET  /api/predictions/:symbol - Get predictions');
-            console.log('   POST /api/sync/historical/:symbol - Backfill historical data (Alpha Vantage)');
+            if (!NO_EXTERNAL_APIS) console.log('   POST /api/sync/historical/:symbol - Backfill historical data (Alpha Vantage)');
             console.log('   POST /api/sort/stocks      - Sort stocks');
             console.log('   GET  /api/sort/criteria    - Get sort criteria');
             console.log('   POST /api/auth/register    - Register user');
