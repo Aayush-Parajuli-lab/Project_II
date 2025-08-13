@@ -22,6 +22,9 @@ import bcrypt from 'bcrypt';
 import jwt from 'jsonwebtoken';
 import session from 'express-session';
 import cookieParser from 'cookie-parser';
+import fs from 'fs';
+import path from 'path';
+import { fileURLToPath } from 'url';
 import passport, { isGoogleAuthConfigured } from './config/googleAuth.js';
 import NinjaStockAPI from './services/ninjaStockAPI.js';
 import AlphaVantageAPI from './services/alphaVantageAPI.js';
@@ -143,8 +146,9 @@ const dbConfig = {
     database: process.env.DB_NAME || 'stock_prediction_db',
     port: process.env.DB_PORT || 3306,
     connectionLimit: 10,
-    acquireTimeout: 60000,
-    timeout: 60000
+    waitForConnections: true,
+    queueLimit: 0,
+    connectTimeout: 60000
 };
 
 // Create database connection pool
@@ -498,8 +502,13 @@ async function initializeDatabase() {
         
     } catch (error) {
         console.error('❌ Database connection failed:', error.message);
-        console.log('💡 Falling back to DEMO MODE (in-memory data). To use MySQL, start the DB and unset DEMO_MODE.');
-        db = createDemoDb();
+        if (DEMO_MODE_REQUESTED) {
+            console.log('💡 Falling back to DEMO MODE (in-memory data).');
+            db = createDemoDb();
+        } else {
+            console.error('🛑 DEMO_MODE is disabled. Please configure MySQL credentials in backend/.env and ensure the database is running.');
+            process.exit(1);
+        }
     }
 }
 
@@ -508,20 +517,31 @@ async function initializeDatabase() {
  */
 async function initializeSchema() {
     try {
-        console.log('📋 Initializing database schema...');
-        
-        // Check if stocks table exists, create if not
-        const [tables] = await db.execute(
-            "SELECT COUNT(*) as count FROM information_schema.tables WHERE table_schema = ? AND table_name = 'stocks'",
-            [dbConfig.database]
-        );
-        
-        if (tables[0].count === 0) {
-            console.log('🏗️ Creating database tables...');
-            // Read and execute schema file would go here
-            // For now, we'll assume the schema exists
-            console.log('⚠️ Please run the database_schema.sql file to create tables');
+        console.log('📋 Checking and applying database schema...');
+
+        const __filename = fileURLToPath(import.meta.url);
+        const __dirname = path.dirname(__filename);
+        const schemaPath = path.resolve(__dirname, '../database_schema.sql');
+        if (!fs.existsSync(schemaPath)) {
+            console.warn('⚠️ Schema file not found at:', schemaPath);
+            return;
         }
+
+        const raw = fs.readFileSync(schemaPath, 'utf8');
+        // Basic split on semicolons, ignoring blank lines and comments
+        const statements = raw
+            .split(/;\s*\n/)
+            .map(s => s.trim())
+            .filter(s => s.length > 0 && !s.startsWith('--'));
+
+        for (const sql of statements) {
+            try {
+                await db.execute(sql);
+            } catch (e) {
+                // Ignore errors for existing objects
+            }
+        }
+        console.log('✅ Schema ensured');
         
     } catch (error) {
         console.error('❌ Schema initialization failed:', error.message);
