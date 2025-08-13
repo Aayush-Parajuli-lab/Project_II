@@ -38,7 +38,8 @@ dotenv.config();
 // Demo mode flags
 const DEMO_MODE_REQUESTED = (process.env.DEMO_MODE || '').toString().toLowerCase() === 'true' || process.env.DEMO_MODE === '1';
 let DEMO_MODE_ACTIVE = false;
-const NO_EXTERNAL_APIS = (process.env.NO_EXTERNAL_APIS || '').toString().toLowerCase() === 'true' || process.env.NO_EXTERNAL_APIS === '1';
+const STATIC_MODE = (process.env.STATIC_MODE || '').toString().toLowerCase() === 'true' || process.env.STATIC_MODE === '1';
+const NO_EXTERNAL_APIS = STATIC_MODE || (process.env.NO_EXTERNAL_APIS || '').toString().toLowerCase() === 'true' || process.env.NO_EXTERNAL_APIS === '1';
 
 // Initialize Express app
 const app = express();
@@ -160,6 +161,25 @@ let db;
 function createDemoDb() {
     console.log('🧪 Starting in DEMO MODE with in-memory data. No MySQL required.');
     DEMO_MODE_ACTIVE = true;
+    const __filename = fileURLToPath(import.meta.url);
+    const __dirname = path.dirname(__filename);
+    const dataDir = path.resolve(__dirname, './data');
+    const predictionsFile = path.join(dataDir, 'predictions.json');
+    if (!fs.existsSync(dataDir)) {
+        try { fs.mkdirSync(dataDir, { recursive: true }); } catch {}
+    }
+    const savePredictions = (arr) => {
+        try { fs.writeFileSync(predictionsFile, JSON.stringify(arr, null, 2), 'utf8'); } catch {}
+    };
+    const loadPredictions = () => {
+        try {
+            if (fs.existsSync(predictionsFile)) {
+                const j = JSON.parse(fs.readFileSync(predictionsFile, 'utf8'));
+                return Array.isArray(j) ? j : [];
+            }
+        } catch {}
+        return [];
+    };
     const now = new Date();
     let autoId = 1000;
     const nextId = () => ++autoId;
@@ -203,7 +223,7 @@ function createDemoDb() {
         { id: 2, setting_key: 'enable_real_time_data', setting_value: 'true', description: '', updated_by: null, updated_at: now }
     ];
     const admin_logs = [];
-    const predictions = [];
+    const predictions = STATIC_MODE ? loadPredictions() : [];
     const historical_data = [];
     // Seed 90 days of synthetic historical data for all stocks
     const seedDays = 90;
@@ -346,6 +366,7 @@ function createDemoDb() {
             if (q.startsWith('INSERT INTO predictions')) {
                 const [stock_id, prediction_date, predicted_price, confidence_score, prediction_type, algorithm_used] = params;
                 predictions.push({ id: nextId(), stock_id, prediction_date, predicted_price, confidence_score, prediction_type, algorithm_used, created_at: new Date() });
+                if (STATIC_MODE) savePredictions(predictions);
                 return [{ insertId: predictions[predictions.length - 1].id, affectedRows: 1 }];
             }
 

@@ -128,9 +128,11 @@ ALPHA_VANTAGE_API_KEY=your_alpha_vantage_key
 
 # Optional: disable external API calls and return synthetic predictions
 NO_EXTERNAL_APIS=true
+# Or use full static mode (implies NO_EXTERNAL_APIS)
+STATIC_MODE=true
 ```
 
-If predictions fail due to insufficient data, the server will try to auto-sync via Alpha Vantage (when NO_EXTERNAL_APIS is not enabled). In static mode (NO_EXTERNAL_APIS=true), prediction endpoints return deterministic synthetic results based on last known close and skip external requests.
+In static mode, all external API calls are disabled, predictions are generated from synthetic logic, and saved to `backend/data/predictions.json` so they persist across restarts.
 
 ### 4. Frontend Setup
 ```bash
