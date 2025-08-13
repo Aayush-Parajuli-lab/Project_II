@@ -366,3 +366,49 @@ This project is for educational purposes. Not intended as financial advice.
 **⚠️ Disclaimer**: This application is for educational purposes only. Stock predictions are not financial advice. Always consult with financial professionals before making investment decisions.
 
 **📊 Educational Focus**: This project demonstrates full-stack development concepts, machine learning integration, algorithm implementation, and modern web development practices.
+
+### Authentication
+
+- Username/password:
+  - Register: `POST /api/auth/register` (body: `{ username, email, password }`)
+  - Login: `POST /api/auth/login` (body: `{ username, password }` or `{ email, password }`)
+  - Frontend routes: `http://localhost:3000/auth`
+- Google OAuth:
+  - Start: `GET /api/auth/google`
+  - Callback: `/api/auth/google/callback` (configured via Google Cloud)
+
+### Admin
+- Login: `POST /api/admin/login` (demo: admin/admin123) or UI at `/admin/login`
+- Verify: `GET /api/admin/verify` with `Authorization: Bearer <token>`
+
+## 🧪 How to Run (User and Admin)
+
+1) Backend
+```bash
+cd backend
+npm install
+# optional: cp .env.example .env && edit credentials
+npm run dev
+```
+
+2) Frontend
+```bash
+cd frontend
+npm install
+npm start
+```
+
+3) User flow
+- Navigate to `/auth`
+  - Register a new account with username, email, password
+  - Or login with username/email and password
+  - Or click Continue with Google (configure credentials per GOOGLE_OAUTH_SETUP.md)
+- After login, token is stored in localStorage as `authToken`
+
+4) Admin flow
+- Navigate to `/admin/login`
+- Use credentials: admin / admin123 (demo)
+- On success, you are redirected to `/admin/dashboard`. Admin token is in `localStorage.adminToken`
+
+5) Predictions dashboard
+- Navigate to `/predictions` to view top predicted gainers

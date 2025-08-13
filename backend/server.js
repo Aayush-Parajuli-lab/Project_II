@@ -326,14 +326,46 @@ function createDemoDb() {
             }
 
             // Users admin queries
-            if (q.includes('FROM users') && q.includes('WHERE username = ?')) {
+            if (q.includes('FROM users') && q.includes('WHERE username = ?') && q.includes('role = "admin"')) {
                 const username = params[0];
                 const role = 'admin';
                 return [users.filter(u => u.username === username && u.role === role)];
             }
+            // Generic user queries
+            if (q.startsWith('SELECT id FROM users WHERE username = ? OR email = ?')) {
+                const [username, email] = params;
+                const u = users.find(u => u.username === username || u.email === email);
+                return [u ? [{ id: u.id }] : []];
+            }
+            if (q.startsWith('SELECT id, username, email, password_hash, role, is_active FROM users WHERE username = ?')) {
+                const username = params[0];
+                const data = users.filter(u => u.username === username);
+                return [data];
+            }
+            if (q.startsWith('SELECT id, username, email, password_hash, role, is_active FROM users WHERE email = ?')) {
+                const email = params[0];
+                const data = users.filter(u => u.email === email);
+                return [data];
+            }
+            if (q.startsWith('SELECT id, username, email, password_hash, role, is_active FROM users WHERE username = ? OR email = ?')) {
+                const [username, email] = params;
+                const data = users.filter(u => u.username === username || u.email === email);
+                return [data];
+            }
+            if (q.startsWith('INSERT INTO users (username, email, password_hash, role) VALUES')) {
+                const [username, email, password_hash, role] = params;
+                if (users.find(u => u.username === username || u.email === email)) {
+                    const err = new Error('Duplicate');
+                    err.code = 'ER_DUP_ENTRY';
+                    throw err;
+                }
+                const id = nextId();
+                users.push({ id, username, email, password_hash, role: role || 'user', is_active: true, last_login: null, created_at: new Date() });
+                return [{ insertId: id, affectedRows: 1 }];
+            }
             if (q.startsWith('UPDATE users SET last_login = CURRENT_TIMESTAMP WHERE id = ?')) {
-                const id = params[0];
-                const user = users.find(u => u.id === Number(id));
+                const id = Number(params[0]);
+                const user = users.find(u => u.id === id);
                 if (user) user.last_login = new Date();
                 return [{ affectedRows: user ? 1 : 0 }];
             }
@@ -344,8 +376,12 @@ function createDemoDb() {
                 const id = Number(params.at(-1));
                 const user = users.find(u => u.id === id);
                 if (!user) return [{ affectedRows: 0 }];
-                if (q.includes('is_active = ?')) user.is_active = !!params[0];
-                if (q.includes('role = ?')) user.role = params[q.includes('is_active = ?') ? 1 : 0];
+                // Supports: SET is_active = ?, role = ? WHERE id = ?
+                const hasIsActive = q.includes('is_active = ?');
+                const hasRole = q.includes('role = ?');
+                let idx = 0;
+                if (hasIsActive) { user.is_active = !!params[idx]; idx += 1; }
+                if (hasRole) { user.role = params[idx]; idx += 1; }
                 return [{ affectedRows: 1 }];
             }
 
@@ -535,6 +571,90 @@ app.post('/api/admin/login', async (req, res) => {
             error: 'Login failed',
             details: error.message
         });
+    }
+});
+
+/**
+ * POST /api/auth/register
+ * User registration endpoint
+ */
+app.post('/api/auth/register', async (req, res) => {
+    try {
+        const { username, email, password } = req.body;
+
+        if (!username || !email || !password) {
+            return res.status(400).json({ success: false, error: 'Username, email and password are required' });
+        }
+
+        // Check duplicate username/email
+        const [existing] = await db.execute('SELECT id FROM users WHERE username = ? OR email = ?', [username, email]);
+        if (existing.length > 0) {
+            return res.status(409).json({ success: false, error: 'Username or email already exists' });
+        }
+
+        const passwordHash = await bcrypt.hash(password, 10);
+
+        const [result] = await db.execute(
+            'INSERT INTO users (username, email, password_hash, role) VALUES (?, ?, ?, ?)',
+            [username, email, passwordHash, 'user']
+        );
+
+        const newUser = { id: result.insertId, username, email, role: 'user' };
+        const token = jwt.sign(newUser, JWT_SECRET, { expiresIn: '24h' });
+
+        res.status(201).json({ success: true, data: { token, user: newUser } });
+    } catch (error) {
+        console.error('❌ Error during user registration:', error);
+        res.status(500).json({ success: false, error: 'Registration failed', details: error.message });
+    }
+});
+
+/**
+ * POST /api/auth/login
+ * User login endpoint (username/email + password)
+ */
+app.post('/api/auth/login', async (req, res) => {
+    try {
+        const { username, email, password } = req.body;
+        if ((!username && !email) || !password) {
+            return res.status(400).json({ success: false, error: 'Provide username or email and password' });
+        }
+
+        let rows;
+        if (username) {
+            [rows] = await db.execute('SELECT id, username, email, password_hash, role, is_active FROM users WHERE username = ?', [username]);
+        } else {
+            [rows] = await db.execute('SELECT id, username, email, password_hash, role, is_active FROM users WHERE email = ?', [email]);
+        }
+
+        if (!rows || rows.length === 0) {
+            return res.status(401).json({ success: false, error: 'Invalid credentials' });
+        }
+
+        const user = rows[0];
+        if (!user.is_active) {
+            return res.status(401).json({ success: false, error: 'Account is deactivated' });
+        }
+
+        let valid = false;
+        try {
+            valid = await bcrypt.compare(password, user.password_hash);
+        } catch (_) {
+            valid = false;
+        }
+        if (!valid) {
+            return res.status(401).json({ success: false, error: 'Invalid credentials' });
+        }
+
+        await db.execute('UPDATE users SET last_login = CURRENT_TIMESTAMP WHERE id = ?', [user.id]);
+
+        const payload = { id: user.id, username: user.username, email: user.email, role: user.role };
+        const token = jwt.sign(payload, JWT_SECRET, { expiresIn: '24h' });
+
+        res.json({ success: true, data: { token, user: payload } });
+    } catch (error) {
+        console.error('❌ Error during user login:', error);
+        res.status(500).json({ success: false, error: 'Login failed', details: error.message });
     }
 });
 
@@ -889,17 +1009,35 @@ if (isGoogleAuthConfigured) {
     // Google OAuth callback route
     app.get('/api/auth/google/callback',
         passport.authenticate('google', { failureRedirect: '/login' }),
-        (req, res) => {
-            const token = jwt.sign(
-                { 
-                    id: req.user.googleId, 
-                    email: req.user.email,
-                    name: req.user.name 
-                },
-                JWT_SECRET,
-                { expiresIn: '24h' }
-            );
-            res.redirect(`http://localhost:3000/auth/success?token=${token}`);
+        async (req, res) => {
+            try {
+                // Ensure a local user exists for this Google account
+                const email = req.user.email;
+                const name = req.user.name;
+                const username = (email?.split('@')[0] || name || 'user').toLowerCase();
+
+                // Try fetching by email
+                const [existing] = await db.execute('SELECT id, username, email, role FROM users WHERE email = ?', [email]);
+                let dbUser;
+                if (existing.length > 0) {
+                    dbUser = existing[0];
+                } else {
+                    // Create user with a placeholder password hash
+                    const placeholderHash = await bcrypt.hash('GOOGLE_AUTH', 10);
+                    const [result] = await db.execute(
+                        'INSERT INTO users (username, email, password_hash, role) VALUES (?, ?, ?, ?)',
+                        [username, email, placeholderHash, 'user']
+                    );
+                    dbUser = { id: result.insertId, username, email, role: 'user' };
+                }
+
+                // Issue JWT for the user
+                const token = jwt.sign({ id: dbUser.id, username: dbUser.username, email: dbUser.email, role: dbUser.role }, JWT_SECRET, { expiresIn: '24h' });
+                res.redirect(`http://localhost:3000/auth/success?token=${token}`);
+            } catch (error) {
+                console.error('❌ Google OAuth callback error:', error);
+                res.redirect('http://localhost:3000/login?error=oauth_failed');
+            }
         }
     );
 } else {
@@ -1724,7 +1862,10 @@ async function startServer() {
             console.log('   GET  /api/predictions/:symbol - Get predictions');
             console.log('   POST /api/sort/stocks      - Sort stocks');
             console.log('   GET  /api/sort/criteria    - Get sort criteria');
-            console.log('   POST /api/fetch-realtime/:symbol - Fetch real-time data');
+            console.log('   POST /api/auth/register    - Register user');
+            console.log('   POST /api/auth/login       - User login');
+            console.log('   GET  /api/auth/user        - Get authenticated user');
+            console.log('   GET  /api/auth/google      - Google OAuth');
             console.log('\n🎯 Ready for frontend connection!\n');
         });
         

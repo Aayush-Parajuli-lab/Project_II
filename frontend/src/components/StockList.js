@@ -446,6 +446,25 @@ const StockList = ({ stocks, loading, error, onFetchStocks, serverStatus }) => {
           </p>
         </Link>
       </div>
+
+      {/* Footer */}
+      <div className="footer mt-xl">
+        <div className="footer-content">
+          <div className="footer-section">
+            <h4>Tech Stack</h4>
+            <p>React • Node.js • MySQL</p>
+            <p>Google OAuth • Machine Learning</p>
+          </div>
+          
+          {/* Quick Login CTA */}
+          {!localStorage.getItem('authToken') && (
+            <div className="footer-section">
+              <h4>Account</h4>
+              <p><a href="/auth" className="text-primary">Login or Register</a></p>
+            </div>
+          )}
+        </div>
+      </div>
     </div>
   );
 };
