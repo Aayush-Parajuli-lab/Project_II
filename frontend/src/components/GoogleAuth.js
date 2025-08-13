@@ -7,6 +7,7 @@ const GoogleAuth = ({ onAuthSuccess }) => {
   const [mode, setMode] = useState('login');
   const [formData, setFormData] = useState({ usernameOrEmail: '', password: '', username: '', email: '' });
   const [error, setError] = useState('');
+  const [isAdminMode, setIsAdminMode] = useState(false);
 
   const checkAuthStatus = useCallback(async () => {
     const token = localStorage.getItem('authToken');
@@ -78,13 +79,26 @@ const GoogleAuth = ({ onAuthSuccess }) => {
 
     try {
       if (mode === 'login') {
-        const payload = formData.usernameOrEmail.includes('@')
-          ? { email: formData.usernameOrEmail, password: formData.password }
-          : { username: formData.usernameOrEmail, password: formData.password };
-        const res = await axios.post('/api/auth/login', payload);
-        if (res.data.success) {
-          localStorage.setItem('authToken', res.data.data.token);
-          await checkAuthStatus();
+        if (isAdminMode) {
+          // Admin login via /api/admin/login
+          const payload = { username: formData.usernameOrEmail, password: formData.password };
+          const res = await axios.post('/api/admin/login', payload);
+          if (res.data.success) {
+            const { token } = res.data.data;
+            localStorage.setItem('adminToken', token);
+            // Redirect to Admin Dashboard
+            window.location.assign('/admin/dashboard');
+            return;
+          }
+        } else {
+          const payload = formData.usernameOrEmail.includes('@')
+            ? { email: formData.usernameOrEmail, password: formData.password }
+            : { username: formData.usernameOrEmail, password: formData.password };
+          const res = await axios.post('/api/auth/login', payload);
+          if (res.data.success) {
+            localStorage.setItem('authToken', res.data.data.token);
+            await checkAuthStatus();
+          }
         }
       } else {
         if (!formData.username || !formData.email || !formData.password) {
@@ -138,7 +152,7 @@ const GoogleAuth = ({ onAuthSuccess }) => {
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-md w-full">
           <div className="p-md">
-            <h4 className="mb-sm">{mode === 'login' ? 'Login' : 'Create Account'}</h4>
+            <h4 className="mb-sm">{mode === 'login' ? (isAdminMode ? 'Admin Login' : 'Login') : 'Create Account'}</h4>
             <form onSubmit={handleSubmit} className="space-y-3">
               {mode === 'login' ? (
                 <>
@@ -146,7 +160,7 @@ const GoogleAuth = ({ onAuthSuccess }) => {
                     type="text"
                     name="usernameOrEmail"
                     className="form-input"
-                    placeholder="Username or Email"
+                    placeholder={isAdminMode ? 'Admin username' : 'Username or Email'}
                     value={formData.usernameOrEmail}
                     onChange={handleInputChange}
                     disabled={isLoading}
@@ -162,6 +176,16 @@ const GoogleAuth = ({ onAuthSuccess }) => {
                     disabled={isLoading}
                     autoComplete="current-password"
                   />
+                  <div className="flex items-center gap-sm">
+                    <input
+                      id="adminMode"
+                      type="checkbox"
+                      checked={isAdminMode}
+                      onChange={(e) => setIsAdminMode(e.target.checked)}
+                      disabled={isLoading}
+                    />
+                    <label htmlFor="adminMode" className="text-sm">Login as Admin</label>
+                  </div>
                 </>
               ) : (
                 <>
@@ -201,10 +225,10 @@ const GoogleAuth = ({ onAuthSuccess }) => {
               {error && <div className="error-message">{error}</div>}
 
               <button type="submit" disabled={isLoading} className="btn btn-primary w-full">
-                {isLoading ? 'Please wait...' : mode === 'login' ? 'Login' : 'Create Account'}
+                {isLoading ? 'Please wait...' : mode === 'login' ? (isAdminMode ? 'Login to Admin' : 'Login') : 'Create Account'}
               </button>
 
-              <button type="button" className="btn btn-link w-full" onClick={() => setMode(mode === 'login' ? 'register' : 'login')}>
+              <button type="button" className="btn btn-link w-full" onClick={() => { setMode(mode === 'login' ? 'register' : 'login'); setIsAdminMode(false); }}>
                 {mode === 'login' ? "Don't have an account? Register" : 'Have an account? Login'}
               </button>
             </form>
