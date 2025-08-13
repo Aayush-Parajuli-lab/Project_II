@@ -8,6 +8,7 @@ const GoogleAuth = ({ onAuthSuccess }) => {
   const [formData, setFormData] = useState({ usernameOrEmail: '', password: '', username: '', email: '' });
   const [error, setError] = useState('');
   const [isAdminMode, setIsAdminMode] = useState(false);
+  const [googleAvailable, setGoogleAvailable] = useState(true);
 
   const checkAuthStatus = useCallback(async () => {
     const token = localStorage.getItem('authToken');
@@ -43,6 +44,11 @@ const GoogleAuth = ({ onAuthSuccess }) => {
       window.history.replaceState({}, document.title, window.location.pathname);
       checkAuthStatus();
     }
+
+    // Check Google availability
+    axios.get('/api/auth/google/status')
+      .then(res => setGoogleAvailable(!!res.data?.configured))
+      .catch(() => setGoogleAvailable(false));
   }, [checkAuthStatus]);
 
   const handleGoogleLogin = () => {
@@ -238,7 +244,7 @@ const GoogleAuth = ({ onAuthSuccess }) => {
             <h4 className="mb-sm">Or continue with</h4>
             <button 
               onClick={handleGoogleLogin} 
-              disabled={isLoading}
+              disabled={isLoading || !googleAvailable}
               className="google-auth-btn w-full"
             >
               <svg className="google-icon" viewBox="0 0 24 24">
@@ -252,6 +258,9 @@ const GoogleAuth = ({ onAuthSuccess }) => {
 
             <div className="auth-disclaimer mt-md">
               <p>By signing in, you agree to our terms of service and privacy policy.</p>
+              {!googleAvailable && (
+                <p className="text-sm text-warning mt-sm">Google sign-in is not configured on the server.</p>
+              )}
             </div>
           </div>
         </div>

@@ -235,6 +235,30 @@ function createDemoDb() {
         }
     }
 
+    // Seed sample predictions for admin dashboard visibility
+    for (const s of stocks.slice(0, 10)) {
+        const recent = historical_data
+            .filter(h => h.stock_id === s.id)
+            .sort((a,b) => new Date(b.date) - new Date(a.date))[0];
+        if (!recent) continue;
+        for (let k = 3; k >= 1; k--) {
+            const createdAt = new Date(now);
+            createdAt.setDate(now.getDate() - (Math.floor(Math.random()*20) + k));
+            const predicted = Number((recent.close_price * (1 + (Math.random()-0.5)*0.05)).toFixed(2));
+            const conf = Math.round(50 + Math.random()*50);
+            predictions.push({
+                id: nextId(),
+                stock_id: s.id,
+                prediction_date: createdAt.toISOString().split('T')[0],
+                predicted_price: predicted,
+                confidence_score: conf,
+                prediction_type: 'short_term',
+                algorithm_used: 'random_forest',
+                created_at: createdAt
+            });
+        }
+    }
+
     const like = (a, b) => a.toLowerCase().includes(b.toLowerCase());
 
     return {
@@ -324,6 +348,36 @@ function createDemoDb() {
                 const sym = params[0];
                 const stock = stocks.find(s => s.symbol === sym);
                 const data = (stock ? predictions.filter(p => p.stock_id === stock.id) : []).map(p => ({ ...p, symbol: sym, company_name: stock?.company_name }));
+                return [data];
+            }
+
+            // Recent predictions across all stocks
+            if (q.startsWith('SELECT p.*, s.symbol, s.company_name') && q.includes('FROM predictions p') && q.includes('JOIN stocks s')) {
+                const data = predictions.map(p => {
+                    const st = stocks.find(s => s.id === p.stock_id);
+                    return { ...p, symbol: st?.symbol, company_name: st?.company_name };
+                }).sort((a,b) => new Date(b.created_at) - new Date(a.created_at));
+                // Handle LIMIT if present
+                const m = q.match(/LIMIT\s+(\d+)/i);
+                const limit = m ? parseInt(m[1]) : data.length;
+                return [data.slice(0, limit)];
+            }
+
+            // Accuracy stats for last 30 days
+            if (q.startsWith('SELECT') && q.includes('AVG(confidence_score)') && q.includes('FROM predictions')) {
+                const cutoff = new Date(now);
+                cutoff.setDate(now.getDate() - 30);
+                const recentPreds = predictions.filter(p => new Date(p.created_at) >= cutoff);
+                const avg = recentPreds.length ? (recentPreds.reduce((a,b)=>a + (Number(b.confidence_score)||0), 0) / recentPreds.length) : 0;
+                const high = recentPreds.filter(p => Number(p.confidence_score) >= 70).length;
+                return [[{ avg_confidence: avg, high_confidence_count: high, total_predictions: recentPreds.length }]];
+            }
+
+            // Admin logs join
+            if (q.startsWith('SELECT al.*, u.username') && q.includes('FROM admin_logs al')) {
+                const data = admin_logs.map(l => ({ ...l, username: users.find(u => u.id === l.admin_id)?.username || 'admin' }))
+                    .sort((a, b) => new Date(b.created_at) - new Date(a.created_at))
+                    .slice(0, 20);
                 return [data];
             }
 
@@ -1050,6 +1104,11 @@ if (isGoogleAuthConfigured) {
         res.status(503).json({ success: false, error: 'Google OAuth not configured' });
     });
 }
+
+// Google status endpoint for frontend to detect availability
+app.get('/api/auth/google/status', (req, res) => {
+    res.json({ success: true, configured: isGoogleAuthConfigured });
+});
 
 // Get current user info
 app.get('/api/auth/user', authenticateToken, (req, res) => {
