@@ -329,7 +329,8 @@ function createDemoDb() {
                     throw err;
                 }
                 const id = nextId();
-                stocks.push({ id, symbol, company_name, sector: sector || null, market_cap: null, created_at: now, updated_at: now });
+                const defaultCap = STATIC_MODE ? (5e9 + Math.floor(Math.random() * 300e9)) : null;
+                stocks.push({ id, symbol, company_name, sector: sector || null, market_cap: defaultCap, created_at: now, updated_at: now });
                 return [{ insertId: id, affectedRows: 1 }];
             }
 
@@ -1236,7 +1237,19 @@ app.get('/api/stocks/predicted-gainers', async (req, res) => {
                  ORDER BY date ASC`,
                 [stock.id]
             );
-            if (historicalData.length < 50) continue;
+            if (historicalData.length < 50) {
+                if (NO_EXTERNAL_APIS) {
+                    const last = historicalData.at(-1)?.close_price || 100;
+                    const change = 1 + ((Math.abs(stock.symbol.charCodeAt(0) % 7) + 1) / 200); // ~0.5% to 4%
+                    results.push({
+                        ...stock,
+                        predicted_price: Number((last * change).toFixed(2)),
+                        predicted_change_percent: Number(((change - 1) * 100).toFixed(2)),
+                        predicted_confidence: 75
+                    });
+                }
+                continue;
+            }
 
             if (!randomForest.isTrained) {
                 randomForest.train(historicalData);
@@ -1675,11 +1688,22 @@ app.get('/api/stocks/predicted-gainers', async (req, res) => {
                  ORDER BY date ASC`,
                 [stock.id]
             );
-            if (historicalData.length < 50) continue;
+            if (historicalData.length < 50) {
+                if (NO_EXTERNAL_APIS) {
+                    const last = historicalData.at(-1)?.close_price || 100;
+                    const change = 1 + ((Math.abs(stock.symbol.charCodeAt(0) % 7) + 1) / 200); // ~0.5% to 4%
+                    results.push({
+                        ...stock,
+                        predicted_price: Number((last * change).toFixed(2)),
+                        predicted_change_percent: Number(((change - 1) * 100).toFixed(2)),
+                        predicted_confidence: 75
+                    });
+                }
+                continue;
+            }
 
             if (!randomForest.isTrained) {
-                const trainingResult = randomForest.train(historicalData);
-                // Even if RF fails, class enables fallback
+                randomForest.train(historicalData);
             }
 
             const predictionResult = randomForest.predict(historicalData, 1);
