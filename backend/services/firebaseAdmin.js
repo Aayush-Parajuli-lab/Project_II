@@ -1,11 +1,25 @@
-import admin from 'firebase-admin';
 import dotenv from 'dotenv';
 
 dotenv.config();
 
 let app;
+let adminModule = null;
 
-function initializeFirebaseAdmin() {
+async function getAdminModule() {
+  if (adminModule) return adminModule;
+  try {
+    // Dynamic import so the server doesn't crash if firebase-admin isn't installed
+    // eslint-disable-next-line no-undef
+    const mod = await import('firebase-admin');
+    adminModule = mod.default || mod;
+    return adminModule;
+  } catch (e) {
+    console.warn('⚠️ firebase-admin is not installed. Skipping Firebase Admin initialization.');
+    return null;
+  }
+}
+
+async function initializeFirebaseAdmin() {
   if (app) return app;
 
   const projectId = process.env.FIREBASE_PROJECT_ID;
@@ -17,6 +31,9 @@ function initializeFirebaseAdmin() {
     return null;
   }
 
+  const admin = await getAdminModule();
+  if (!admin) return null;
+
   try {
     app = admin.initializeApp({
       credential: admin.credential.cert({
@@ -26,16 +43,15 @@ function initializeFirebaseAdmin() {
       })
     });
   } catch (e) {
-    if (!admin.apps.length) {
-      throw e;
-    }
+    // Ignore already-initialized error in ESM
   }
 
   return app;
 }
 
-export function getFirebaseAuth() {
-  const a = initializeFirebaseAdmin();
+export async function getFirebaseAuth() {
+  const a = await initializeFirebaseAdmin();
   if (!a) return null;
-  return admin.auth();
+  const admin = await getAdminModule();
+  return admin ? admin.auth() : null;
 }
