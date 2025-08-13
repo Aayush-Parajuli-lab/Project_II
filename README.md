@@ -118,6 +118,17 @@ DB_NAME=stock_prediction_db
 DB_PORT=3306
 ```
 
+Add to `backend/.env`:
+```env
+# Ninja real-time quotes (current price)
+NINJA_API_KEY=your_ninja_key
+
+# Alpha Vantage for historical OHLC
+ALPHA_VANTAGE_API_KEY=your_alpha_vantage_key
+```
+
+If predictions fail due to insufficient data, the server will attempt to auto-sync recent history via Alpha Vantage.
+
 ### 4. Frontend Setup
 ```bash
 cd ../frontend
@@ -170,6 +181,7 @@ The application uses a well-structured MySQL database:
 ### Predictions
 - `POST /api/predict/:symbol` - Generate Random Forest prediction
 - `GET /api/predictions/:symbol` - Get historical predictions
+- `POST /api/sync/historical/:symbol` - Backfill historical OHLC data using Alpha Vantage (`{ outputSize: 'compact' | 'full' }`)
 
 ### Sorting Algorithms
 - `POST /api/sort/stocks` - Sort stocks using various algorithms
