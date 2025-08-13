@@ -48,11 +48,17 @@ function App() {
     token: localStorage.getItem('adminToken'),
     user: null
   });
+  const [userAuth, setUserAuth] = useState({
+    isAuthenticated: false,
+    token: localStorage.getItem('authToken'),
+    user: null
+  });
 
   // Check server health on component mount
   useEffect(() => {
     checkServerHealth();
     checkAdminAuth();
+    checkUserAuth();
   }, []);
 
   /**
@@ -84,29 +90,39 @@ function App() {
     }
   };
 
-  const logoutAdmin = () => {
+  /**
+   * Check user authentication status
+   */
+  const checkUserAuth = async () => {
+    const token = localStorage.getItem('authToken');
+    if (!token) return;
+
     try {
-      localStorage.removeItem('adminToken');
-    } catch {}
+      const response = await axios.get('/api/auth/user', {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      if (response.data.success) {
+        setUserAuth({ isAuthenticated: true, token, user: response.data.data.user });
+      }
+    } catch (error) {
+      localStorage.removeItem('authToken');
+      setUserAuth({ isAuthenticated: false, token: null, user: null });
+    }
+  };
+
+  const logoutAdmin = () => {
+    try { localStorage.removeItem('adminToken'); } catch {}
     setAdminAuth({ isAuthenticated: false, token: null, user: null });
   };
 
-  /**
-   * Check if backend server is running and healthy
-   */
-  const checkServerHealth = async () => {
-    try {
-      const response = await axios.get('/api/health');
-      if (response.data.success) {
-        setServerStatus('healthy');
-        console.log('✅ Backend server is healthy');
-      } else {
-        setServerStatus('unhealthy');
-      }
-    } catch (error) {
-      console.error('❌ Backend server health check failed:', error);
-      setServerStatus('offline');
-    }
+  const logoutUser = async () => {
+    try { await axios.post('/api/auth/logout'); } catch {}
+    try { localStorage.removeItem('authToken'); } catch {}
+    setUserAuth({ isAuthenticated: false, token: null, user: null });
+  };
+
+  const handleUserAuthSuccess = (user) => {
+    setUserAuth({ isAuthenticated: true, token: localStorage.getItem('authToken'), user });
   };
 
   /**
@@ -170,7 +186,7 @@ function App() {
       {/* Router provided by index.js */}
       <div className="app-container">
         {/* Header/Navigation */}
-        <Header serverStatus={serverStatus} onRefreshHealth={checkServerHealth} />
+        <Header serverStatus={serverStatus} onRefreshHealth={checkServerHealth} userAuth={userAuth} onLogoutUser={logoutUser} />
         
         {/* Main Content */}
         <main className="main-content">
@@ -207,16 +223,14 @@ function App() {
               element={<AddStock onAddStock={addStock} />} 
             />
             
-
-            
-            {/* Google Auth Routes */}
+            {/* Google/Auth Route */}
             <Route 
               path="/auth" 
-              element={<GoogleAuth />} 
+              element={<GoogleAuth onAuthSuccess={handleUserAuthSuccess} />} 
             />
             <Route 
               path="/auth/success" 
-              element={<GoogleAuth />} 
+              element={<GoogleAuth onAuthSuccess={handleUserAuthSuccess} />} 
             />
             
             {/* Admin Routes */}
@@ -249,7 +263,7 @@ function App() {
 /**
  * Header Component with Navigation
  */
-function Header({ serverStatus, onRefreshHealth }) {
+function Header({ serverStatus, onRefreshHealth, userAuth, onLogoutUser }) {
   const location = useLocation();
 
   const getServerStatusColor = () => {
@@ -301,12 +315,22 @@ function Header({ serverStatus, onRefreshHealth }) {
           >
             Add Stock
           </Link>
-          <Link 
-            to="/auth" 
-            className={`nav-link ${location.pathname.startsWith('/auth') ? 'active' : ''}`}
-          >
-            Login
-          </Link>
+          {userAuth?.isAuthenticated ? (
+            <button 
+              onClick={onLogoutUser}
+              className="nav-link btn btn-link"
+              title={userAuth.user?.email}
+            >
+              Logout ({userAuth.user?.name || userAuth.user?.username || 'User'})
+            </button>
+          ) : (
+            <Link 
+              to="/auth" 
+              className={`nav-link ${location.pathname.startsWith('/auth') ? 'active' : ''}`}
+            >
+              Login
+            </Link>
+          )}
         </nav>
 
         {/* Server Status */}
