@@ -24,6 +24,7 @@ import session from 'express-session';
 import cookieParser from 'cookie-parser';
 import passport, { isGoogleAuthConfigured } from './config/googleAuth.js';
 import NinjaStockAPI from './services/ninjaStockAPI.js';
+import AlphaVantageAPI from './services/alphaVantageAPI.js';
 import { StockRandomForest } from './algorithms/randomForest.js';
 import { StockSorter } from './utils/sortingAlgorithms.js';
 
@@ -75,6 +76,7 @@ const randomForest = new StockRandomForest({
 
 const stockSorter = new StockSorter();
 const ninjaAPI = new NinjaStockAPI();
+const alphaAPI = new AlphaVantageAPI();
 
 // JWT Secret
 const JWT_SECRET = process.env.JWT_SECRET || 'stock-predict-jwt-secret';
@@ -1343,7 +1345,7 @@ app.post('/api/predict/:symbol', async (req, res) => {
         const stockId = stocks[0].id;
         
         // Get historical data for training/prediction
-        const [historicalData] = await db.execute(
+        let [historicalData] = await db.execute(
             `SELECT date, open_price, high_price, low_price, close_price, volume, adj_close
              FROM historical_data 
              WHERE stock_id = ? 
@@ -1352,12 +1354,36 @@ app.post('/api/predict/:symbol', async (req, res) => {
         );
         
         if (historicalData.length < 50) {
-            return res.status(400).json({
-                success: false,
-                error: 'Insufficient historical data for prediction (minimum 50 data points required)'
-            });
+            // Try to backfill using Alpha Vantage (compact ~100 days)
+            try {
+                const records = await alphaAPI.getDailyAdjusted(symbol, 'compact');
+                // Insert missing historical rows
+                for (const r of records) {
+                    await db.execute(
+                        `INSERT IGNORE INTO historical_data 
+                         (stock_id, date, open_price, high_price, low_price, close_price, volume, adj_close)
+                         VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+                        [stockId, r.date, r.open, r.high, r.low, r.close, r.volume || 0, r.adj_close || r.close]
+                    );
+                }
+                // Re-fetch
+                const [refetched] = await db.execute(
+                    `SELECT date, open_price, high_price, low_price, close_price, volume, adj_close
+                     FROM historical_data 
+                     WHERE stock_id = ? 
+                     ORDER BY date ASC`,
+                    [stockId]
+                );
+                historicalData = refetched;
+            } catch (syncErr) {
+                return res.status(400).json({
+                    success: false,
+                    error: 'Insufficient historical data and failed to backfill from Alpha Vantage',
+                    details: syncErr.message
+                });
+            }
         }
-
+        
         // Use Random Forest (class internally falls back to moving average if RF fails)
         if (!randomForest.isTrained || retrain) {
             console.log('🌲 Training Random Forest model...');
@@ -1419,6 +1445,39 @@ app.post('/api/predict/:symbol', async (req, res) => {
             error: 'Failed to generate prediction',
             details: error.message
         });
+    }
+});
+
+/**
+ * POST /api/sync/historical/:symbol
+ * Backfill historical data using Alpha Vantage
+ */
+app.post('/api/sync/historical/:symbol', async (req, res) => {
+    try {
+        const { symbol } = req.params;
+        const { outputSize = 'compact' } = req.body || {};
+
+        const [stocks] = await db.execute('SELECT id FROM stocks WHERE symbol = ?', [symbol.toUpperCase()]);
+        if (stocks.length === 0) {
+            return res.status(404).json({ success: false, error: 'Stock not found' });
+        }
+        const stockId = stocks[0].id;
+
+        const records = await alphaAPI.getDailyAdjusted(symbol, outputSize);
+        let inserted = 0;
+        for (const r of records) {
+            const [result] = await db.execute(
+                `INSERT IGNORE INTO historical_data 
+                 (stock_id, date, open_price, high_price, low_price, close_price, volume, adj_close)
+                 VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+                [stockId, r.date, r.open, r.high, r.low, r.close, r.volume || 0, r.adj_close || r.close]
+            );
+            inserted += result?.affectedRows ? 1 : 0;
+        }
+
+        res.json({ success: true, data: { inserted, totalFetched: records.length } });
+    } catch (error) {
+        res.status(500).json({ success: false, error: 'Failed to sync historical data', details: error.message });
     }
 });
 
@@ -1860,6 +1919,7 @@ async function startServer() {
             console.log('   POST /api/stocks           - Add new stock');
             console.log('   POST /api/predict/:symbol  - Generate prediction');
             console.log('   GET  /api/predictions/:symbol - Get predictions');
+            console.log('   POST /api/sync/historical/:symbol - Backfill historical data (Alpha Vantage)');
             console.log('   POST /api/sort/stocks      - Sort stocks');
             console.log('   GET  /api/sort/criteria    - Get sort criteria');
             console.log('   POST /api/auth/register    - Register user');
