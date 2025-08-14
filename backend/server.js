@@ -31,6 +31,7 @@ import AlphaVantageAPI from './services/alphaVantageAPI.js';
 import { StockRandomForest } from './algorithms/randomForest.js';
 import { StockSorter } from './utils/sortingAlgorithms.js';
 import { getFirebaseAuth } from './services/firebaseAdmin.js';
+import { predictWithPython } from './services/pythonPredictor.js';
 
 // Load environment variables
 dotenv.config();
@@ -1508,30 +1509,12 @@ app.post('/api/predict/:symbol', async (req, res) => {
             });
         }
         
-        // Use Random Forest (class internally falls back to moving average if RF fails)
-        if (!randomForest.isTrained || retrain) {
-            console.log('🌲 Training Random Forest model...');
-            const trainingResult = randomForest.train(historicalData);
-            
-            if (trainingResult.success === false) {
-                return res.status(500).json({
-                    success: false,
-                    error: 'Failed to train prediction model',
-                    details: trainingResult.error
-                });
-            }
+        // Predict using Python random-forest-like script (no external ML libs)
+        const pyResult = await predictWithPython(historicalData, days_ahead);
+        if (!pyResult.success) {
+            return res.status(500).json({ success: false, error: 'Prediction failed', details: pyResult.error || pyResult.details });
         }
-        
-        // Make prediction
-        const predictionResult = randomForest.predict(historicalData, days_ahead);
-        
-        if (!predictionResult.success) {
-            return res.status(500).json({
-                success: false,
-                error: 'Failed to generate prediction',
-                details: predictionResult.error
-            });
-        }
+        const predictionResult = { success: true, predictedPrice: pyResult.predictedPrice, confidence: pyResult.confidence };
         
         // Save prediction to database
         const predictionDate = new Date();
@@ -1547,7 +1530,7 @@ app.post('/api/predict/:symbol', async (req, res) => {
                 predictionResult.predictedPrice,
                 predictionResult.confidence,
                 days_ahead <= 1 ? 'short_term' : days_ahead <= 7 ? 'medium_term' : 'long_term',
-                'random_forest'
+                'python_rf'
             ]
         );
         
@@ -1965,7 +1948,7 @@ app.get('/api/model/info', (req, res) => {
  * Daily task to update stock data
  * Runs every day at 6 PM (after market close)
  */
-if (!DEMO_MODE_ACTIVE && !NO_EXTERNAL_APIS) cron.schedule('0 18 * * 1-5', async () => {
+if (!DEMO_MODE_ACTIVE && !NO_EXTERNAL_APIS) cron.schedule('0 5 * * *', async () => {
     console.log('📅 Running daily stock data update...');
     
     try {
