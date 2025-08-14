@@ -612,6 +612,33 @@ async function initializeSchema() {
         }
         console.log('✅ Schema ensured');
         
+        // Seed reference stock and history if none present (live mode)
+        const [stockCount] = await db.execute('SELECT COUNT(*) as c FROM stocks');
+        if ((stockCount[0]?.c || 0) === 0) {
+            console.log('🌱 Seeding reference stock AAPL...');
+            const [ins] = await db.execute('INSERT INTO stocks (symbol, company_name, sector, market_cap) VALUES (?, ?, ?, ?)', [
+                'AAPL', 'Apple Inc.', 'Technology', 2500000000000
+            ]);
+            const stockId = ins.insertId;
+            const today = new Date();
+            for (let i = 30; i >= 1; i--) {
+                const d = new Date(today);
+                d.setDate(today.getDate() - i);
+                const base = 180 + (i / 3);
+                const close = Number((base + Math.sin(i / 2) * 2).toFixed(2));
+                const open = Number((close + (Math.random() - 0.5) * 1.0).toFixed(2));
+                const high = Number((Math.max(open, close) + Math.random() * 1.2).toFixed(2));
+                const low = Number((Math.min(open, close) - Math.random() * 1.2).toFixed(2));
+                const volume = 50000000 + Math.floor(Math.random() * 10000000);
+                await db.execute(
+                    `INSERT IGNORE INTO historical_data (stock_id, date, open_price, high_price, low_price, close_price, volume, adj_close)
+                     VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+                    [stockId, d.toISOString().split('T')[0], open, high, low, close, volume, close]
+                );
+            }
+            console.log('✅ Reference history seeded');
+        }
+        
     } catch (error) {
         console.error('❌ Schema initialization failed:', error.message);
     }
