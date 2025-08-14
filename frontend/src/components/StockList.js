@@ -438,13 +438,6 @@ const StockList = ({ stocks, loading, error, onFetchStocks, serverStatus }) => {
             See Random Forest predictions for all stocks
           </p>
         </Link>
-
-        <Link to="/sorting-demo" className="card text-center hover:scale-105">
-          <h3 className="text-primary">🔀 Algorithm Demo</h3>
-          <p className="text-secondary mt-sm">
-            Interactive demonstration of sorting algorithms
-          </p>
-        </Link>
       </div>
 
       {/* Footer */}
