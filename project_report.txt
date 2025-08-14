@@ -120,6 +120,148 @@ Frontend performance optimization includes code splitting, lazy loading, and eff
 
 Monitoring and alerting systems track performance metrics including response times, error rates, and resource utilization to identify potential performance issues before they impact users. The system implements automatic performance optimization features such as database query optimization and cache warming to maintain optimal performance over time.
 
+3.9 Data Flow Diagrams (DFD)
+
+The Data Flow Diagrams provide a visual representation of how data moves through the StockVision Pro system at different levels of abstraction. These diagrams illustrate the flow of information between external entities, processes, and data stores, enabling developers and stakeholders to understand the system's data processing requirements and identify potential bottlenecks or optimization opportunities.
+
+3.9.1 Level 0 DFD (Context Diagram)
+
+The Level 0 DFD represents the highest level of abstraction, showing StockVision Pro as a single process interacting with external entities. The system receives stock market data from external financial APIs, user authentication requests from web browsers, and administrative commands from system administrators. The system processes these inputs and generates outputs including stock predictions, user dashboards, and system reports.
+
+External entities include stock market data providers (Ninja API, Alpha Vantage), user browsers accessing the web application, Google OAuth services for authentication, and system administrators managing the platform. Data flows include real-time stock quotes, historical OHLCV data, user credentials, authentication tokens, prediction requests, and system configuration updates. This level provides stakeholders with a clear understanding of the system's scope and external dependencies.
+
+3.9.2 Level 1 DFD (System Overview)
+
+The Level 1 DFD breaks down the main system into major processes and data stores. The system consists of four main processes: User Authentication and Management, Stock Data Processing, Machine Learning Prediction Engine, and Data Visualization and Reporting. Each process handles specific aspects of the application's functionality while maintaining clear separation of concerns.
+
+Data stores include the User Database for authentication and profile information, Stock Database for company and market data, Historical Data Store for OHLCV information, and Prediction Database for machine learning outputs. Data flows between processes include user credentials, stock symbols, historical data sets, technical indicators, prediction results, and user preferences. This level provides developers with an understanding of the system's major components and their interactions.
+
+3.9.3 Level 2 DFD (Detailed Process View)
+
+The Level 2 DFD provides detailed views of each major process, showing the internal subprocesses and data flows. The User Authentication and Management process includes subprocesses for credential validation, session management, role assignment, and profile updates. The Stock Data Processing process includes subprocesses for data validation, technical indicator calculation, data storage, and real-time updates.
+
+The Machine Learning Prediction Engine includes subprocesses for feature engineering, model training, prediction generation, and confidence scoring. The Data Visualization and Reporting process includes subprocesses for chart generation, data formatting, user interface updates, and report generation. Each subprocess has specific inputs, outputs, and data requirements that must be carefully managed to ensure system reliability.
+
+3.10 Use Case Diagrams
+
+The Use Case Diagrams illustrate the interactions between system actors and the various use cases that the StockVision Pro system supports. These diagrams help stakeholders understand the system's functionality from a user perspective and identify the scope of features that need to be implemented.
+
+3.10.1 Primary Actor Use Cases
+
+Primary actors include retail investors, intermediate traders, and advanced users who interact with the system to perform stock analysis and obtain predictions. Use cases for these actors include user registration and authentication, stock search and selection, real-time price monitoring, historical data analysis, technical indicator viewing, prediction generation, and watchlist management.
+
+Each use case includes preconditions that must be met before execution, postconditions that describe the system state after completion, and alternative flows that handle exceptional situations. The use cases are designed to be intuitive and accessible to users with varying levels of technical expertise, ensuring that the system can serve a broad range of users effectively.
+
+3.10.2 Secondary Actor Use Cases
+
+Secondary actors include system administrators, external data providers, and automated system processes. Use cases for system administrators include user management, system configuration, performance monitoring, and security administration. External data providers supply real-time and historical stock data through standardized API interfaces.
+
+Automated system processes include scheduled data updates, machine learning model retraining, performance optimization, and backup operations. These use cases ensure that the system operates reliably and efficiently without requiring constant manual intervention, while maintaining data accuracy and system performance.
+
+3.11 System Flow Diagrams
+
+The System Flow Diagrams illustrate the sequence of operations and decision points within the StockVision Pro system. These diagrams show how different processes interact and how the system responds to various inputs and conditions.
+
+3.11.1 User Authentication Flow
+
+The user authentication flow begins when a user attempts to access the system, either through traditional username/password login or Google OAuth integration. The system validates the user's credentials against the user database, generates appropriate authentication tokens, and establishes a secure session. The flow includes error handling for invalid credentials, account lockouts for security violations, and session management for maintaining user state.
+
+The authentication flow also handles password reset requests, account verification, and role-based access control. Users are assigned appropriate permissions based on their account type and subscription level, ensuring that they can only access features and data appropriate to their account status. The flow maintains security by implementing proper session expiration, concurrent session limits, and secure token storage.
+
+3.11.2 Stock Prediction Flow
+
+The stock prediction flow begins when a user requests a price prediction for a specific stock symbol. The system retrieves the stock's historical data from the database, calculates technical indicators, and applies the trained machine learning model to generate predictions. The flow includes data validation, feature engineering, model inference, and result formatting.
+
+The prediction flow handles various scenarios including insufficient historical data, model training requirements, and confidence scoring. Users receive predictions with confidence scores and explanatory information to help them understand the prediction's reliability. The system stores prediction results for future reference and accuracy tracking, enabling continuous improvement of the machine learning models.
+
+3.11.3 Data Processing Flow
+
+The data processing flow handles the continuous ingestion and processing of stock market data from external sources. The system receives real-time updates, validates data quality, calculates technical indicators, and stores processed information in the database. The flow includes error handling for data quality issues, retry mechanisms for failed API calls, and data transformation for consistency.
+
+The data processing flow also handles historical data backfilling, data cleanup operations, and performance optimization. The system implements efficient data storage strategies and maintains data integrity through proper validation and constraint enforcement. Regular data maintenance operations ensure optimal system performance and data quality over time.
+
+3.12 Entity Relationship Diagrams (ERD)
+
+The Entity Relationship Diagrams illustrate the structure and relationships between different data entities in the StockVision Pro system. These diagrams show how data is organized and connected, enabling developers to understand the database schema and implement proper data access patterns.
+
+3.12.1 Core Entity Relationships
+
+The core entities include users, stocks, historical data, predictions, and watchlists. Users can have multiple watchlists, and watchlists can contain multiple stocks. Each stock has multiple historical data records and can generate multiple predictions. The relationships between these entities are maintained through foreign key constraints that ensure data integrity and enable efficient querying.
+
+The entity relationships support various business operations including user portfolio management, historical analysis, prediction tracking, and personalized dashboard generation. The design ensures that users can efficiently access their data while maintaining proper data isolation and security. The relationships also support advanced features such as trend analysis, correlation studies, and portfolio optimization.
+
+3.12.2 Extended Entity Relationships
+
+Extended entities include system settings, admin logs, and user preferences that support system administration and customization. System settings control various aspects of system behavior including feature availability, performance parameters, and security settings. Admin logs track system activities for security auditing and troubleshooting purposes.
+
+User preferences store individual customization options including interface themes, notification settings, and default analysis parameters. These extended entities enable the system to provide personalized experiences while maintaining centralized control over system configuration and security. The relationships between extended entities and core entities support comprehensive system functionality and user experience customization.
+
+3.13 System Architecture Patterns
+
+The StockVision Pro system implements several architectural patterns to ensure maintainability, scalability, and reliability. These patterns provide proven solutions to common software design challenges and enable the system to evolve and grow over time.
+
+3.13.1 Model-View-Controller (MVC) Pattern
+
+The MVC pattern separates the application into three main components: the model that represents data and business logic, the view that handles user interface presentation, and the controller that manages user input and coordinates between the model and view. This separation enables independent development and testing of different system components while maintaining clear interfaces between them.
+
+The model layer includes data access objects, business logic services, and domain models that represent the core business entities. The view layer includes React components that render user interfaces and handle user interactions. The controller layer includes API endpoints and middleware that process user requests and coordinate system responses.
+
+3.13.2 Repository Pattern
+
+The repository pattern abstracts data access logic and provides a consistent interface for data operations. This pattern enables the system to switch between different data sources without affecting business logic and simplifies testing by allowing mock repositories to be used during development. The repository pattern also centralizes data access logic and enables consistent error handling and logging.
+
+Repository implementations include stock data repositories, user repositories, prediction repositories, and historical data repositories. Each repository provides methods for common data operations including create, read, update, and delete operations. The repositories also implement caching strategies and connection pooling to optimize performance and resource usage.
+
+3.13.3 Service Layer Pattern
+
+The service layer pattern encapsulates business logic and provides a clean interface for complex operations. This pattern separates business rules from data access and presentation logic, enabling better code organization and testing. Services coordinate between different repositories and implement business rules that span multiple entities.
+
+Service implementations include stock analysis services, prediction services, user management services, and authentication services. Each service implements specific business logic and coordinates with appropriate repositories to fulfill user requests. The service layer also handles transaction management, error handling, and business rule validation to ensure data consistency and system reliability.
+
+3.14 Security Architecture
+
+The security architecture implements multiple layers of protection to ensure the confidentiality, integrity, and availability of the StockVision Pro system. This architecture addresses various security threats and implements industry best practices for financial applications.
+
+3.14.1 Authentication Architecture
+
+The authentication architecture implements multiple authentication methods including traditional username/password authentication and OAuth integration with Google. Password authentication uses bcrypt hashing with appropriate salt rounds to protect user credentials. OAuth integration provides secure third-party authentication while maintaining user privacy and security.
+
+The authentication system implements proper session management with JWT tokens that include expiration times and user context information. Sessions are validated on each request and automatically expired when security conditions are not met. The system also implements account lockout mechanisms and suspicious activity detection to prevent unauthorized access attempts.
+
+3.14.2 Authorization Architecture
+
+The authorization architecture implements role-based access control that determines what features and data users can access based on their account type and permissions. The system defines different user roles including regular users, premium users, and administrators, each with specific access rights and feature limitations.
+
+Authorization checks are implemented at multiple levels including API endpoints, user interface components, and data access layers. The system ensures that users can only access data and features appropriate to their account status and maintains proper data isolation between different user accounts. The authorization system also supports dynamic permission updates and audit logging for security compliance.
+
+3.14.3 Data Security Architecture
+
+The data security architecture implements encryption for sensitive information and secure transmission protocols for all data communications. Database connections use encryption to protect data in transit, and sensitive user information is encrypted before storage. The system implements secure cookie handling and HTTPS enforcement to protect user sessions and data transmission.
+
+The data security architecture also includes input validation and sanitization to prevent common web application vulnerabilities such as SQL injection and cross-site scripting. The system implements proper error handling that does not expose sensitive system information and maintains comprehensive audit logs for security monitoring and compliance purposes.
+
+3.15 Performance Architecture
+
+The performance architecture implements various optimization strategies to ensure that the StockVision Pro system meets performance requirements and provides a responsive user experience. This architecture addresses both frontend and backend performance considerations.
+
+3.15.1 Database Performance Architecture
+
+The database performance architecture implements strategic indexing, query optimization, and connection pooling to ensure fast data access. Indexes are created on frequently queried columns including stock symbols, dates, and user identifiers. Query optimization includes proper SQL structure, parameterized queries, and result set limiting to minimize resource usage.
+
+Connection pooling enables efficient database connection management and reduces connection overhead for multiple concurrent users. The system also implements query caching for frequently requested data and implements data partitioning strategies for large historical datasets. Regular database maintenance operations ensure optimal performance over time.
+
+3.15.2 API Performance Architecture
+
+The API performance architecture implements asynchronous processing, request batching, and response caching to optimize API response times. Asynchronous processing enables time-consuming operations such as machine learning predictions to be handled without blocking user requests. Request batching allows multiple data requests to be processed together, reducing overall system overhead.
+
+Response caching stores frequently requested data in memory to reduce database queries and improve response times. The system implements intelligent cache invalidation strategies that ensure data consistency while maximizing cache effectiveness. API performance is monitored continuously to identify bottlenecks and optimization opportunities.
+
+3.15.3 Frontend Performance Architecture
+
+The frontend performance architecture implements code splitting, lazy loading, and efficient state management to ensure smooth user interactions. Code splitting enables the application to load only the code needed for current functionality, reducing initial load times and improving user experience. Lazy loading defers the loading of non-critical components until they are needed.
+
+Efficient state management minimizes unnecessary re-renders and optimizes component updates. The system implements progressive loading strategies that display critical information immediately while loading additional details in the background. Real-time updates are optimized to maintain smooth user experience during data updates.
+
 ========================================================
 
 4. TECHNICAL SPECIFICATIONS
