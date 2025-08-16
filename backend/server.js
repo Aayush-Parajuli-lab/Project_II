@@ -85,13 +85,13 @@ const stockSorter = new StockSorter();
 const ninjaAPI = new NinjaStockAPI();
 const alphaAPI = new AlphaVantageAPI();
 
-// JWT Secret
+// JWT Secret (kept for admin only)
 const JWT_SECRET = process.env.JWT_SECRET || 'stock-predict-jwt-secret';
 
 /**
- * Authentication Middleware
+ * Admin Authentication Middleware (kept for admin panel)
  */
-const authenticateToken = (req, res, next) => {
+const authenticateAdminToken = (req, res, next) => {
     const authHeader = req.headers['authorization'];
     const token = authHeader && authHeader.split(' ')[1]; // Bearer TOKEN
 
