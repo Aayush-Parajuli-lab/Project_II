@@ -1,4 +1,4 @@
--- Stock Prediction App Database Schema
+-- StockVision Pro - Information Sharing Platform Database Schema
 -- Create database
 CREATE DATABASE IF NOT EXISTS stock_prediction_db;
 USE stock_prediction_db;
@@ -38,33 +38,22 @@ CREATE TABLE IF NOT EXISTS predictions (
     predicted_price DECIMAL(10, 2) NOT NULL,
     confidence_score DECIMAL(5, 2), -- 0.00 to 100.00
     prediction_type ENUM('short_term', 'medium_term', 'long_term') DEFAULT 'short_term',
-    algorithm_used VARCHAR(50) DEFAULT 'moving_average',
+    algorithm_used VARCHAR(50) DEFAULT 'random_forest',
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (stock_id) REFERENCES stocks(id) ON DELETE CASCADE
 );
 
--- Users table for tracking user preferences and admin access
-CREATE TABLE IF NOT EXISTS users (
+-- Admin users table (kept for admin panel access)
+CREATE TABLE IF NOT EXISTS admin_users (
     id INT AUTO_INCREMENT PRIMARY KEY,
     username VARCHAR(50) NOT NULL UNIQUE,
     email VARCHAR(100) NOT NULL UNIQUE,
     password_hash VARCHAR(255) NOT NULL,
-    role ENUM('user', 'admin') DEFAULT 'user',
+    role ENUM('admin') DEFAULT 'admin',
     is_active BOOLEAN DEFAULT TRUE,
     last_login TIMESTAMP NULL,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
-);
-
--- User watchlist table
-CREATE TABLE IF NOT EXISTS watchlist (
-    id INT AUTO_INCREMENT PRIMARY KEY,
-    user_id INT NOT NULL,
-    stock_id INT NOT NULL,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
-    FOREIGN KEY (stock_id) REFERENCES stocks(id) ON DELETE CASCADE,
-    UNIQUE KEY unique_user_stock (user_id, stock_id)
 );
 
 -- Admin activity logs table
@@ -77,7 +66,7 @@ CREATE TABLE IF NOT EXISTS admin_logs (
     details JSON,
     ip_address VARCHAR(45),
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (admin_id) REFERENCES users(id) ON DELETE CASCADE
+    FOREIGN KEY (admin_id) REFERENCES admin_users(id) ON DELETE CASCADE
 );
 
 -- System settings table
@@ -88,10 +77,10 @@ CREATE TABLE IF NOT EXISTS system_settings (
     description TEXT,
     updated_by INT,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    FOREIGN KEY (updated_by) REFERENCES users(id) ON DELETE SET NULL
+    FOREIGN KEY (updated_by) REFERENCES admin_users(id) ON DELETE SET NULL
 );
 
--- Insert some sample stocks
+-- Insert sample stocks
 INSERT IGNORE INTO stocks (symbol, company_name, sector) VALUES 
 ('AAPL', 'Apple Inc.', 'Technology'),
 ('GOOGL', 'Alphabet Inc.', 'Technology'),
@@ -100,24 +89,25 @@ INSERT IGNORE INTO stocks (symbol, company_name, sector) VALUES
 ('TSLA', 'Tesla Inc.', 'Automotive'),
 ('NVDA', 'NVIDIA Corporation', 'Technology'),
 ('META', 'Meta Platforms Inc.', 'Technology'),
-('NFLX', 'Netflix Inc.', 'Entertainment'),
-('DIS', 'The Walt Disney Company', 'Entertainment'),
-('V', 'Visa Inc.', 'Financial Services');
+('BRK.A', 'Berkshire Hathaway Inc.', 'Financial Services'),
+('UNH', 'UnitedHealth Group Inc.', 'Healthcare'),
+('JNJ', 'Johnson & Johnson', 'Healthcare');
 
 -- Insert default admin user (password: admin123)
-INSERT IGNORE INTO users (username, email, password_hash, role) VALUES 
-('admin', 'admin@stockpredict.ai', '$2b$10$rQJ3qKqE7yPXg8qKqE7yPOu9l5H3qKqE7yPXg8qKqE7yPOu9l5H3qK', 'admin');
+INSERT IGNORE INTO admin_users (username, email, password_hash, role) VALUES 
+('admin', 'admin@stockvision.com', '$2b$10$rQZ8K9X2Y1W3E4F5G6H7I8J9K0L1M2N3O4P5Q6R7S8T9U0V1W2X3Y4Z5', 'admin');
 
--- Insert default system settings
+-- Insert system settings
 INSERT IGNORE INTO system_settings (setting_key, setting_value, description) VALUES 
-('app_name', 'StockPredict AI', 'Application name displayed in UI'),
-('max_predictions_per_day', '100', 'Maximum predictions allowed per day'),
-('enable_real_time_data', 'true', 'Enable real-time stock data fetching'),
-('prediction_confidence_threshold', '70', 'Minimum confidence for displaying predictions'),
-('auto_retrain_model', 'true', 'Automatically retrain ML model with new data');
+('platform_mode', 'information_sharing', 'Platform operating mode'),
+('public_access', 'true', 'Whether stock data is publicly accessible'),
+('admin_required', 'true', 'Whether admin login is required for management'),
+('api_rate_limit', '1000', 'API requests per hour per IP'),
+('prediction_algorithm', 'random_forest', 'Default prediction algorithm');
 
 -- Create indexes for better performance
-CREATE INDEX idx_historical_date ON historical_data(date);
-CREATE INDEX idx_historical_stock_date ON historical_data(stock_id, date);
-CREATE INDEX idx_predictions_date ON predictions(prediction_date);
-CREATE INDEX idx_predictions_stock ON predictions(stock_id);
+CREATE INDEX idx_stocks_symbol ON stocks(symbol);
+CREATE INDEX idx_stocks_sector ON stocks(sector);
+CREATE INDEX idx_historical_data_stock_date ON historical_data(stock_id, date);
+CREATE INDEX idx_predictions_stock_date ON predictions(stock_id, prediction_date);
+CREATE INDEX idx_admin_users_username ON admin_users(username);
