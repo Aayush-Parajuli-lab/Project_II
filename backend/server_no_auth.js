@@ -627,6 +627,143 @@ app.post('/api/admin/logout', authenticateAdminToken, requireAdmin, async (req, 
     }
 });
 
+/**
+ * POST /api/admin/generate-stock-data
+ * Generate synthetic stock data using Python script
+ */
+app.post('/api/admin/generate-stock-data', authenticateAdminToken, requireAdmin, async (req, res) => {
+    try {
+        const { spawn } = await import('child_process');
+        const pythonScript = path.join(process.cwd(), 'ml', 'generate_stock_data.py');
+        
+        if (!fs.existsSync(pythonScript)) {
+            return res.status(404).json({
+                success: false,
+                error: 'Python script not found'
+            });
+        }
+
+        const pythonProcess = spawn('python3', [pythonScript], {
+            cwd: path.join(process.cwd(), 'ml')
+        });
+
+        let output = '';
+        let errorOutput = '';
+
+        pythonProcess.stdout.on('data', (data) => {
+            output += data.toString();
+        });
+
+        pythonProcess.stderr.on('data', (data) => {
+            errorOutput += data.toString();
+        });
+
+        pythonProcess.on('close', (code) => {
+            if (code === 0) {
+                res.json({
+                    success: true,
+                    message: 'Stock data generated successfully',
+                    output: output.trim()
+                });
+            } else {
+                res.status(500).json({
+                    success: false,
+                    error: 'Python script execution failed',
+                    details: errorOutput.trim(),
+                    exitCode: code
+                });
+            }
+        });
+
+        pythonProcess.on('error', (error) => {
+            res.status(500).json({
+                success: false,
+                error: 'Failed to execute Python script',
+                details: error.message
+            });
+        });
+
+    } catch (error) {
+        console.error('❌ Error generating stock data:', error);
+        res.status(500).json({
+            success: false,
+            error: 'Failed to generate stock data',
+            details: error.message
+        });
+    }
+});
+
+/**
+ * POST /api/admin/generate-predictions
+ * Generate predictions using Random Forest Python script
+ */
+app.post('/api/admin/generate-predictions', authenticateAdminToken, requireAdmin, async (req, res) => {
+    try {
+        // Get all stocks
+        const [stocks] = await db.execute('SELECT id, symbol FROM stocks');
+        
+        if (stocks.length === 0) {
+            return res.status(400).json({
+                success: false,
+                error: 'No stocks found in database'
+            });
+        }
+
+        let totalPredictions = 0;
+        let successfulPredictions = 0;
+
+        for (const stock of stocks) {
+            try {
+                // Get historical data for this stock
+                const [historicalData] = await db.execute(
+                    'SELECT * FROM historical_data WHERE stock_id = ? ORDER BY date ASC',
+                    [stock.id]
+                );
+
+                if (historicalData.length < 50) {
+                    console.log(`⚠️ Skipping ${stock.symbol}: insufficient data (${historicalData.length} points)`);
+                    continue;
+                }
+
+                // Generate prediction using Random Forest
+                const prediction = await randomForest.predict(historicalData);
+                
+                // Save prediction to database
+                await db.execute(
+                    'INSERT INTO predictions (stock_id, prediction_date, predicted_price, confidence_score, prediction_type, algorithm_used) VALUES (?, ?, ?, ?, ?, ?)',
+                    [stock.id, new Date(), prediction.predictedPrice, prediction.confidence, 'short_term', 'random_forest']
+                );
+
+                successfulPredictions++;
+                console.log(`✅ Generated prediction for ${stock.symbol}: $${prediction.predictedPrice} (${prediction.confidence}% confidence)`);
+
+            } catch (stockError) {
+                console.error(`❌ Error generating prediction for ${stock.symbol}:`, stockError);
+            }
+            
+            totalPredictions++;
+        }
+
+        res.json({
+            success: true,
+            message: `Predictions generated successfully`,
+            data: {
+                totalStocks: totalPredictions,
+                successfulPredictions: successfulPredictions,
+                failedPredictions: totalPredictions - successfulPredictions
+            }
+        });
+
+    } catch (error) {
+        console.error('❌ Error generating predictions:', error);
+        res.status(500).json({
+            success: false,
+            error: 'Failed to generate predictions',
+            details: error.message
+        });
+    }
+});
+
 // ============================================================================
 // START SERVER
 // ============================================================================

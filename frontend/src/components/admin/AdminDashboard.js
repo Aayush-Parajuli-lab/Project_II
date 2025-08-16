@@ -13,6 +13,8 @@ const AdminDashboard = ({ adminAuth }) => {
   const [dashboardData, setDashboardData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [generatingData, setGeneratingData] = useState(false);
+  const [generatingPredictions, setGeneratingPredictions] = useState(false);
 
   const fetchDashboardData = useCallback(async () => {
     try {
@@ -56,6 +58,48 @@ const AdminDashboard = ({ adminAuth }) => {
     } finally {
       localStorage.removeItem('adminToken');
       navigate('/admin/login');
+    }
+  };
+
+  const handleGenerateStockData = async () => {
+    try {
+      setGeneratingData(true);
+      const response = await axios.post('/api/admin/generate-stock-data', {}, {
+        headers: { Authorization: `Bearer ${adminAuth.token}` }
+      });
+
+      if (response.data.success) {
+        alert('✅ Stock data generated successfully!');
+        fetchDashboardData(); // Refresh dashboard
+      } else {
+        alert('❌ Failed to generate stock data: ' + response.data.error);
+      }
+    } catch (error) {
+      console.error('Error generating stock data:', error);
+      alert('❌ Error generating stock data: ' + (error.response?.data?.error || error.message));
+    } finally {
+      setGeneratingData(false);
+    }
+  };
+
+  const handleGeneratePredictions = async () => {
+    try {
+      setGeneratingPredictions(true);
+      const response = await axios.post('/api/admin/generate-predictions', {}, {
+        headers: { Authorization: `Bearer ${adminAuth.token}` }
+      });
+
+      if (response.data.success) {
+        alert('✅ Predictions generated successfully!');
+        fetchDashboardData(); // Refresh dashboard
+      } else {
+        alert('❌ Failed to generate predictions: ' + response.data.error);
+      }
+    } catch (error) {
+      console.error('Error generating predictions:', error);
+      alert('❌ Error generating predictions: ' + (error.response?.data?.error || error.message));
+    } finally {
+      setGeneratingPredictions(false);
     }
   };
 
@@ -155,6 +199,20 @@ const AdminDashboard = ({ adminAuth }) => {
                 className="btn btn-success w-full"
               >
                 🔄 Refresh Data
+              </button>
+              <button 
+                onClick={() => handleGenerateStockData()}
+                className="btn btn-warning w-full"
+                disabled={generatingData}
+              >
+                {generatingData ? '⏳ Generating...' : '📊 Generate Stock Data'}
+              </button>
+              <button 
+                onClick={() => handleGeneratePredictions()}
+                className="btn btn-info w-full"
+                disabled={generatingPredictions}
+              >
+                {generatingPredictions ? '⏳ Predicting...' : '🔮 Generate Predictions'}
               </button>
             </div>
           </div>
